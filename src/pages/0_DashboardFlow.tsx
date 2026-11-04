@@ -14,7 +14,7 @@ export function DashboardFlow({ areas: propAreas, vendors: propVendors, permits:
       try {
         const [{ data: vendorsData, count: vendorsCount }, { data: permitsData, count: permitsCount }, { data: areasData, count: areasCount }, { data: patrolsData, count: patrolsCount }] = await Promise.all([
           supabase.from('vendors').select('id', { count: 'exact' }),
-          supabase.from('work_permits').select('id, status, risk_level, risk_score, risk_likelihood, risk_severity, utilities, utility_list, nomor_wp, judul, title, judul_pekerjaan, vendor_name, area_id, area_name, area_type, work_radius_m, area_radius_m, work_area_m2, apd_required, apd_list, jsa_list, k3_list, workers_list, alat_list, kendaraan_list, tgl_mulai, tgl_selesai, start_date, end_date, pj, so, created_at', { count: 'exact' }).order('created_at', { ascending: false }),
+          supabase.from('work_permits').select('id', { count: 'exact' }),
           supabase.from('areas').select('id', { count: 'exact' }),
           supabase.from('e_patrol').select('id', { count: 'exact' }),
         ])

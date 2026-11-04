@@ -64,13 +64,13 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   const [qrWP, setQrWP] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [patrolType, setPatrolType] = useState<PatrolType>('internal')
-  const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString())
+  const [lastSync, setLastSync] = useState(new Date().toISOString().slice(11,16))
 
   const [formData, setFormData] = useState<any>({
     nomor_wp: '', judul_pekerjaan: '', area_id: '', area_name: '', vendor_name: '',
     risk_level: 'medium', risk_score: 9, risk_likelihood: 3, risk_severity: 3,
     tgl_patrol: new Date().toISOString().split('T')[0],
-    jam_patrol: new Date().toLocaleTimeString().slice(0,5),
+    jam_patrol: new Date().toISOString().slice(11,16),
     petugas: 'Safety Officer PT MRH',
     status_patrol: 'safe',
     tingkat_risiko: 'RISK-MINOR',
@@ -86,86 +86,6 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
     { id: 2, nama: 'Siti HSE', jabatan: 'HSE Officer', bagian: 'HSE' },
     { id: 3, nama: 'Joko Vendor', jabatan: 'Safety Vendor', bagian: 'PT MRH DigitalHub' },
   ])
-
-  // V43 FIX ANTI WHITE - Safe states
-  const [sessionIdV43, setSessionIdV43] = useState('')
-  const [tglPatrolV43, setTglPatrolV43] = useState(new Date().toISOString().split('T')[0])
-  const [syncStatusV43, setSyncStatusV43] = useState('')
-
-  // V43 - Load session peserta dari PatrolEntryMobile
-  useEffect(()=>{
-    try{
-      const sess = localStorage.getItem('patrol_session_id') || ''
-      const tgl = localStorage.getItem('patrol_tgl') || new Date().toISOString().split('T')[0]
-      if(sess){
-        setSessionIdV43(sess)
-        setTglPatrolV43(tgl)
-        const raw = localStorage.getItem(`patrol_session_${sess}`)
-        if(raw){
-          const arr = JSON.parse(raw)
-          if(Array.isArray(arr) && arr.length>0){
-            const mapped = arr.map((p:any, idx:number)=>({
-              id: 100+idx,
-              nama: p.nama || '',
-              jabatan: p.jabatan || 'Helper',
-              bagian: p.bagian || 'Area E'
-            })).filter((m:any)=> m.nama && !m.nama.includes('@'))
-            setPesertaGabunganList(prev=>{
-              try{
-                const safePrev = Array.isArray(prev) ? prev : []
-                const names = new Set(safePrev.map((x:any)=> (x.nama||'').toLowerCase()))
-                const add = mapped.filter((m:any)=> !names.has((m.nama||'').toLowerCase()))
-                return [...safePrev, ...add]
-              }catch{ return prev }
-            })
-          }
-        }
-      }
-    }catch{}
-  }, [])
-
-  // V43 - Simpan & Kirim anti crash
-  const handleSimpanKirimV43 = async () => {
-    try{
-      setSyncStatusV43('Sync ke Supabase...')
-      const finalData = {
-        wp: formData.nomor_wp || qrWP || 'mrh-csmswp-2026-003',
-        sessionId: sessionIdV43 || localStorage.getItem('patrol_session_id') || '',
-        tglPatrol: tglPatrolV43,
-        patrolType,
-        pesertaList: patrolType==='gabungan' ? pesertaGabunganList : pesertaInternal.map(n=>({nama:n})),
-        temuanList,
-        selectedSubKategori,
-        status: 'OPEN',
-        createdAt: new Date().toISOString()
-      }
-      localStorage.setItem('admin_contractor_temuan', JSON.stringify(temuanList))
-      localStorage.setItem(`temuan_final_${finalData.wp}`, JSON.stringify(temuanList))
-      localStorage.setItem('admin_contractor_patrol_session', JSON.stringify(finalData))
-      const queue = JSON.parse(localStorage.getItem('patrol_sync_queue')||'[]')
-      queue.push(finalData)
-      localStorage.setItem('patrol_sync_queue', JSON.stringify(queue))
-      try{
-        const payload = {
-          nomor_wp: String(finalData.wp),
-          session_id: String(finalData.sessionId),
-          tgl_patrol: finalData.tglPatrol,
-          mode: String(finalData.patrolType),
-          peserta: finalData.pesertaList,
-          temuan: finalData.temuanList,
-          status: 'OPEN',
-          created_by: 'patrol_integrated@mrhdigitalhub.com'
-        }
-        const { error } = await supabase.from('patrol_findings').insert([payload])
-        if(error) console.warn('Supabase warn', error.message)
-      }catch(e){ console.warn('Supabase skip', e) }
-      setSyncStatusV43(`✅ ${temuanList.length} temuan Simpan & Kirim OK - ${finalData.wp}`)
-      setTimeout(()=> setSyncStatusV43(''), 4000)
-    }catch(e:any){
-      setSyncStatusV43('❌ Gagal: '+(e.message||e))
-    }
-  }
-
   const [newPesertaNama, setNewPesertaNama] = useState('')
   const [newPesertaJabatan, setNewPesertaJabatan] = useState('')
   const [newPesertaBagian, setNewPesertaBagian] = useState('')
@@ -443,7 +363,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
       risk_likelihood: permit.risk_likelihood || 3,
       risk_severity: permit.risk_severity || 3,
       tgl_patrol: new Date().toISOString().split('T')[0],
-      jam_patrol: new Date().toLocaleTimeString().slice(0,5),
+      jam_patrol: new Date().toISOString().slice(11,16),
       petugas: type==='internal' ? 'Safety Officer PT MRH' : 'Tim Gabungan Owner+HSE+Vendor',
       status_patrol: 'safe',
       tingkat_risiko: 'RISK-MINOR',
@@ -764,14 +684,9 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <button onClick={savePatrol} className={`flex-1 ${patrolType==='gabungan'?'bg-purple-700 hover:bg-purple-800':'bg-blue-700 hover:bg-blue-800'} text-white py-2 rounded font-black`}>💾 Simpan Patrol V41 {formData.nomor_wp} - {selectedSubKategori.length} Sub - {temuanList.length} Temuan</button>
-                  <button onClick={handleSimpanKirimV43} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-black">📤 Simpan & Kirim → Admin Contractor</button>
-                  <button onClick={()=>setShowForm(false)} className="px-6 bg-white border py-2 rounded">Batal</button>
-                </div>
-                {syncStatusV43 && <div className="bg-yellow-100 border-2 border-yellow-400 p-2 rounded text-[11px] font-bold">{syncStatusV43}</div>}
-                {sessionIdV43 && <div className="bg-blue-50 border p-2 rounded text-[10px]">V43 Session: {sessionIdV43} | Tgl: {tglPatrolV43} | Peserta: {pesertaGabunganList.length} | Mode: {patrolType}</div>}
+              <div className="flex gap-2">
+                <button onClick={savePatrol} className={`flex-1 ${patrolType==='gabungan'?'bg-purple-700 hover:bg-purple-800':'bg-blue-700 hover:bg-blue-800'} text-white py-2 rounded font-black`}>💾 Simpan Patrol V41 {formData.nomor_wp} - {selectedSubKategori.length} Sub - {temuanList.length} Temuan - Clear pendingPatrol</button>
+                <button onClick={()=>setShowForm(false)} className="px-6 bg-white border py-2 rounded">Batal</button>
               </div>
             </div>
           </div>
