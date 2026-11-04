@@ -476,14 +476,14 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   return (
     <div className="space-y-4 p-2">
       <div className="grid grid-cols-8 gap-2">
-        <div className="bg-white border rounded-lg p-3 text-center"><p className="text-[10px]">WP Siap Patrol</p><p className="font-black">{activePermits.length}</p><p className="text-[8px]">Sync {lastSync}</p></div>
-        <div className="bg-white border rounded-lg p-3 text-center"><p className="text-[10px]">Total Patrol</p><p className="font-black">{patrols.length}</p><p className="text-[8px]">{internalCount} Int {gabunganCount} Gab</p></div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center"><p className="text-[10px]">🔵 Internal</p><p className="font-black text-blue-700">{internalCount}</p><p className="text-[8px]">SO PT MRH</p></div>
+        <div className="bg-orange-100 border border-orange-200 rounded-lg p-3 text-center"><p className="text-[10px]">WP Siap Patrol</p><p className="font-black">{activePermits.length}</p><p className="text-[8px]">Sync {lastSync}</p></div>
+        <div className="bg-amber-100 border border-amber-200 rounded-lg p-3 text-center"><p className="text-[10px]">Total Patrol</p><p className="font-black">{patrols.length}</p><p className="text-[8px]">Int {internalCount} - Gab {gabunganCount}</p></div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center"><p className="text-[10px]">🔵 Internal</p><p className="font-black text-blue-700">{internalCount}</p></div>
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-center"><p className="text-[10px]">🟣 Gabungan</p><p className="font-black text-purple-700">{gabunganCount}</p><p className="text-[8px]">Owner+HSE+Vendor</p></div>
         <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center"><p className="text-[10px]">🟢 SAFE</p><p className="font-black text-green-600">{safeCount}</p></div>
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center"><p className="text-[10px]">🟡 WARNING</p><p className="font-black">{warningCount}</p></div>
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center"><p className="text-[10px]">🔴 OVERLAP</p><p className="font-black text-red-600">{overlapCount}</p></div>
-        <div className="bg-slate-900 text-white rounded-lg p-3 text-center"><p className="text-[10px]">Avg CSMS</p><p className="font-black">{patrols.length>0 ? Math.round((safeCount*100 + warningCount*70 + overlapCount*30)/patrols.length) : 0}</p></div>
+        <div className="bg-green-400 text-white border border-green-500 rounded-lg p-3 text-center"><p className="text-[10px]">Avg CSMS</p><p className="font-black">{patrols.length>0 ? Math.round((safeCount*100 + warningCount*70 + overlapCount*30)/patrols.length) : 0}</p></div>
       </div>
 <div className="bg-white border rounded-xl p-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-2 text-[11px]">
