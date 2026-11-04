@@ -583,7 +583,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
       <button onClick={()=>setShowForm(false)} className="bg-white/20 px-3 py-1 rounded text-xs">✕ Tutup</button>
       </div>
 
-            <div className="p-4 space-y-4 text-xs">
+              <div className="p-4 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={()=>setPatrolType('internal')} className={`py-2 rounded font-black ${patrolType==='internal'?'bg-blue-600 text-white':'bg-white border'}`}>🔵 Patrol Internal</button>
                 <button onClick={()=>setPatrolType('gabungan')} className={`py-2 rounded font-black ${patrolType==='gabungan'?'bg-purple-600 text-white':'bg-white border'}`}>🟣 Patrol Gabungan - Manual Peserta Jabatan Bagian - V41 FIX</button>
