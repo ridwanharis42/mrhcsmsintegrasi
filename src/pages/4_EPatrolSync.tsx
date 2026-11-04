@@ -574,16 +574,17 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
       </div>
 
       {showForm && (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
-      <div className="bg-white rounded-xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden">
-      <div className={`${patrolType==='gabungan'?'bg-purple-700':'bg-blue-700'} text-white p-4 flex justify-between items-center`}>
-      <div><div className="font-black text-sm flex items-center gap-2">
-      <span>{patrolType==='gabungan'?'🟣 Form E-Patrol Gabungan V41':'🔵 Form E-Patrol Internal'} - {formData.nomor_wp} - {formData.judul_pekerjaan}</span>
-      </div></div>
-      <button onClick={()=>setShowForm(false)} className="bg-white/20 px-3 py-1 rounded text-xs">✕ Tutup</button>
-      </div>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
+          <div className="bg-white rounded-xl w-full max-w-6xl max-h-[98vh] overflow-auto">
+            <div className={`${patrolType==='gabungan'?'bg-purple-700':'bg-blue-700'} text-white p-4 flex justify-between items-center`}>
+              <div><div className="font-black text-sm flex items-center gap-2">
+                    <span>{patrolType==='gabungan'?'🟣 Form E-Patrol Gabungan V41':'🔵 Form E-Patrol Internal'} - {formData.nomor_wp} - {formData.judul_pekerjaan}</span>
+                    {patrolType==='gabungan' && <span className="bg-white/20 px-2 py-0.5 rounded text-[10px]">📱 QR Universal: {generateQRUrl(formData.nomor_wp, pesertaGabunganList[0]?.nama||'Peserta', pesertaGabunganList[0]?.jabatan||'').slice(0,70)}... - Manual Peserta</span>}
+                  </div><div className="text-[11px] mt-1">Area: {formData.area_name} | Vendor: {formData.vendor_name} | Risk: {formData.risk_level} {formData.risk_score} ({formData.risk_likelihood}x{formData.risk_severity}) | Type: {patrolType==='gabungan'?'Owner+HSE+Vendor Mingguan Formal Berita Acara':'Safety Officer PT MRH Harian Rutin 1 orang'} | Selected: {selectedSubKategori.length} sub kategori</div></div>
+              <button onClick={()=>setShowForm(false)} className="bg-white/20 px-3 py-1 rounded text-xs">✕ Tutup</button>
+            </div>
 
-              <div className="p-4 space-y-4 text-xs overflow-y-auto flex-1">
+            <div className="p-4 space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <button onClick={()=>setPatrolType('internal')} className={`py-2 rounded font-black ${patrolType==='internal'?'bg-blue-600 text-white':'bg-white border'}`}>🔵 Patrol Internal</button>
                 <button onClick={()=>setPatrolType('gabungan')} className={`py-2 rounded font-black ${patrolType==='gabungan'?'bg-purple-600 text-white':'bg-white border'}`}>🟣 Patrol Gabungan - Manual Peserta Jabatan Bagian - V41 FIX</button>
