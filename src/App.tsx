@@ -132,6 +132,17 @@ export default function App(){
   }
 
   const isSuperAdmin = profile && (profile.role === 'admin_contractor' || profile.email === 'admin_contractor@mrhdigitalhub.com')
+  const isPatrolUser = profile && (profile.role === 'patrol' || profile.email === 'patrol_integrated@mrhdigitalhub.com')
+  // V43 FIX - Sync patrol_findings table yang sudah diperbaharui Supabase
+  useEffect(()=>{
+    if(profile){
+      // Jika patrol_integrated login via QR, langsung arahkan ke patrol jika ada pending
+      const pending = localStorage.getItem('patrol_wp_filter')
+      if(pending && isPatrolUser){
+        setActiveMenu('patrol')
+      }
+    }
+  }, [profile])
 
   const handleLogout = async () => {
     try { await supabase.auth.signOut() } catch {}
@@ -140,7 +151,7 @@ export default function App(){
     window.location.replace('/login')
   }
 
-  const menus=[
+  const allMenus=[
     {id:'dashboard', label:'0. Dashboard Flow', icon:'📊'},
     {id:'vendors', label:'1. Vendor (8 Elemen)', icon:'🏗'},
     {id:'workpermit', label:'2. E-Work Permit (Flow)', icon:'📋'},
@@ -148,6 +159,8 @@ export default function App(){
     {id:'patrol', label:'4. E-Patrol (Sync)', icon:'🚓'},
     {id:'scoring', label:'5. Final Scoring', icon:'⭐'}
   ]
+  // V43 - Patrol user hanya lihat Dashboard + E-Patrol biar nyaman di HP
+  const menus = isPatrolUser ? allMenus.filter(m=> ['dashboard','patrol'].includes(m.id)) : allMenus
 
   if (isCheckingAuth) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="text-sm">Loading...</div></div>
   const isLoginPage = window.location.pathname === '/login'
