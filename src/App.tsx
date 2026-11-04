@@ -154,12 +154,19 @@ export default function App(){
   if (!profile && isLoginPage) return <Login />
   if (!profile && !isLoginPage) { window.location.replace('/login'); return <div className="min-h-screen flex items-center justify-center">Redirect ke Login...</div> }
 
-  // V43 MOBILE ENTRY PAGE - TAMPIL FULL JIKA SCAN QR CHOOSE MODE
+  // V43 MOBILE ENTRY PAGE - TAMPIL FULL JIKA SCAN QR CHOOSE MODE - FIX TOMBOL GABUNGAN MASUK 4_EPATROL
   if (showPatrolEntry && patrolEntryParams){
     return <PatrolEntryMobile initialParams={patrolEntryParams} permits={permits} profile={profile} onChoose={(mode, sessionId, peserta)=>{
+      console.log('[V43] PatrolEntry choose:', mode, sessionId, peserta)
+      localStorage.setItem('patrol_wp_filter', patrolEntryParams.wp || '')
+      localStorage.setItem('patrol_mode', mode)
+      localStorage.setItem('patrol_session_id', sessionId)
+      localStorage.setItem('pendingPatrol', JSON.stringify({wp: patrolEntryParams.wp, mode, sessionId, autoOpen:'1', timestamp: Date.now()}))
       setShowPatrolEntry(false)
+      setPatrolEntryParams(null)
       setActiveMenu('patrol')
-      // sudah disimpan di handleJoin
+      // Force reload slight delay biar 4_EPatrolSync baca localStorage
+      setTimeout(()=> { window.scrollTo(0,0) }, 100)
     }} />
   }
 
