@@ -1,4 +1,5 @@
 // @ts-nocheck - FIX FINAL: Pakai namespace import * as -> TIDAK PERNAH error default/named
+// V41 QR PATROL GABUNGAN FIX - PT MRH DigitalHub - CSMS INTEGRATED
 import { useState, useEffect } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { useAreas } from './hooks/useAreas'
@@ -10,7 +11,6 @@ import { APP_CONFIG } from './types'
 import Login from './pages/Login'
 
 // FIX PUTIH FINAL: Pakai namespace import * as -> Vite TIDAK PERNAH error "does not provide export named 'default'/'DashboardFlow'"
-// Karena kita tidak import nama spesifik, kita import semua sebagai object
 import * as DashMod from './pages/0_DashboardFlow'
 import * as VendMod from './pages/1_Vendor8Elemen'
 import * as WpMod from './pages/2_EWorkPermitFlow'
@@ -21,26 +21,19 @@ import * as SetMod from './pages/6_Settings'
 
 function getComp(mod, name){
   if (!mod) return () => <div className="p-6">Module {name} tidak ditemukan</div>
-  // 1. default export function
   if (typeof mod.default === 'function') return mod.default
-  // 2. default.default (double wrapping)
   if (mod.default && typeof mod.default.default === 'function') return mod.default.default
-  // 3. named export sesuai nama file
   if (typeof mod[name] === 'function') return mod[name]
-  // 4. cari export lain yang namanya mengandung nama (Dashboard, Vendor, WorkPermit, Mapping, Patrol, Scoring, Settings)
   const keys = Object.keys(mod)
   for (const k of keys) {
     if (typeof mod[k] === 'function') {
       const lowerK = k.toLowerCase()
-      const lowerName = name.toLowerCase()
-      if (lowerK.includes(lowerName.replace('flow','').replace('8elemen','').replace('sync','').replace('page','').toLowerCase()) || lowerK.includes('dashboard') || lowerK.includes('vendor') || lowerK.includes('workpermit') || lowerK.includes('mapping') || lowerK.includes('patrol') || lowerK.includes('scoring') || lowerK.includes('setting')) {
+      if (lowerK.includes(name.toLowerCase().replace('flow','').replace('8elemen','').replace('sync','').replace('page','').toLowerCase()) || lowerK.includes('dashboard') || lowerK.includes('vendor') || lowerK.includes('workpermit') || lowerK.includes('mapping') || lowerK.includes('patrol') || lowerK.includes('scoring') || lowerK.includes('setting')) {
         return mod[k]
       }
     }
   }
-  // 5. ambil function pertama yang ketemu di module (fallback)
   for (const k of keys) { if (typeof mod[k] === 'function') return mod[k] }
-  // 6. jika mod itu sendiri function (jarang)
   if (typeof mod === 'function') return mod
   console.error(`GAGAL LOAD ${name}`, mod)
   return () => <div className="p-6 text-red-500">Error: Component {name} tidak bisa dimuat. Cek export di src/pages/</div>
@@ -72,9 +65,51 @@ export default function App(){
 
   useEffect(()=>{
     checkAuth()
+    handleQRPatrol() // V41 FIX QR GABUNGAN
     const interval = setInterval(loadSettings, 1000)
     return () => clearInterval(interval)
   },[])
+
+  // V41 FIX QR PATROL GABUNGAN - AUTO FILTER + AUTO OPEN FORM
+  function handleQRPatrol(){
+    try{
+      if (typeof window === 'undefined') return
+      const params = new URLSearchParams(window.location.search)
+      const isPatrol = params.get('patrol') === '1'
+      const wp = params.get('wp') || params.get('wp_id') || ''
+      const mode = params.get('mode') || 'gabungan'
+      const autoOpen = params.get('autoOpen') || '1'
+      if (isPatrol && wp){
+        console.log('[V41 QR Patrol] Detected:', {wp, mode, autoOpen})
+        // Simpan untuk dibaca 4_EPatrolSync
+        localStorage.setItem('pendingPatrol', JSON.stringify({wp, mode, autoOpen, timestamp: Date.now()}))
+        localStorage.setItem('patrol_wp_filter', wp)
+        localStorage.setItem('patrol_mode', mode)
+        // Auto pindah ke menu patrol
+        setActiveMenu('patrol')
+        // Bersihkan URL tapi jangan hapus filter (V9 LOGIN PERSIST)
+        // Delay 500ms biar EPatrolSync sempat baca
+        setTimeout(()=>{
+          try{
+            const cleanUrl = window.location.pathname
+            window.history.replaceState({}, '', cleanUrl)
+          }catch{}
+        }, 800)
+      } else {
+        // Cek juga pendingPatrol dari scan sebelumnya
+        const pendingRaw = localStorage.getItem('pendingPatrol')
+        if (pendingRaw){
+          try{
+            const p = JSON.parse(pendingRaw)
+            if (p.wp){
+              console.log('[V41 QR Patrol] Found pendingPatrol in storage:', p)
+              setActiveMenu('patrol')
+            }
+          }catch{}
+        }
+      }
+    }catch(e){ console.error('QR Patrol handle error', e) }
+  }
 
   function loadSettings(){
     try { const s = localStorage.getItem('mrh_app_settings'); if (s) setAppSettings(JSON.parse(s)) } catch {}
@@ -105,6 +140,9 @@ export default function App(){
   const handleLogout = async () => {
     try { await supabase.auth.signOut() } catch {}
     localStorage.removeItem('mrh_profile'); localStorage.removeItem('mrh_user_id'); localStorage.removeItem('mrh_role'); localStorage.removeItem('mrh_vendor_id'); localStorage.removeItem('mrh_area_id')
+    // V9 FIX: JANGAN HAPUS patrol data saat logout biar QR persist setelah login lagi
+    // localStorage.removeItem('pendingPatrol') -> JANGAN
+    // localStorage.removeItem('patrol_wp_filter') -> JANGAN
     Object.keys(localStorage).forEach(k => { if (k.startsWith('sb-')) localStorage.removeItem(k) })
     window.location.replace('/login')
   }
@@ -142,7 +180,6 @@ export default function App(){
     <div className="min-h-screen bg-gray-50 flex">
       <Sidebar activeMenu={activeMenu} setActiveMenu={setActiveMenu} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} supabaseUrl={''} menus={menus} appSettings={appSettings} />
       <div className={`${sidebarOpen?'ml-64':'ml-16'} flex-1`}>
-        {/* HEADER SIMPLIFIED - Hanya Logo MRH + PT MRH DigitalHub - CSMS INTEGRATED - Pengaturan + Logout di kanan - FIX: Font + Background Pisah Dipilih via Settings - image_e10b58 + image_f4fea0 */}
         <header className="border-b sticky top-0 z-10 px-6 py-3 flex items-center justify-between" style={{ background: appSettings.company_header_bg || "#ffffff", color: appSettings.company_header_text_color || "#000000" }}>
           <div className="flex items-center gap-3">
             {logoUrl ? <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain bg-white rounded border p-1" /> : <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center text-white font-black text-xs">MRH</div>}
