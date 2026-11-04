@@ -330,6 +330,24 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   const internalCount = patrols.filter(p=>(p.patrol_type||'internal')==='internal').length
   const gabunganCount = patrols.filter(p=>p.patrol_type==='gabungan').length
 
+  // V50 REKAP 4 ELEMEN
+  const rekap4Elemen = useMemo(()=>{
+    const groups = { '1. Elemen CSMS': 0, '2. Fisik Lapangan': 0, '3. Perilaku Pekerja': 0, '4. Tingkat Risiko': 0 }
+    const detail: any = { 'CSMS-ADM':0, 'CSMS-COMP':0, 'CSMS-MOC':0, 'FISIK-APD':0, 'FISIK-TOOLS':0, 'FISIK-HOUSE':0, 'FISIK-BARIKADE':0, 'FISIK-EMER':0, 'PERILAKU-SOP':0, 'PERILAKU-POSISI':0, 'PERILAKU-DISIPLIN':0, 'RISK-CRITICAL':0, 'RISK-MAJOR':0, 'RISK-MINOR':0 }
+    patrols.forEach((p:any)=>{
+      const list = p.temuan_list || []
+      list.forEach((t:any)=>{
+        const code = t.subKategoriCode||''
+        if (code.startsWith('CSMS')) groups['1. Elemen CSMS']++
+        else if (code.startsWith('FISIK')) groups['2. Fisik Lapangan']++
+        else if (code.startsWith('PERILAKU')) groups['3. Perilaku Pekerja']++
+        else if (code.startsWith('RISK')) groups['4. Tingkat Risiko']++
+        if (detail[code]!==undefined) detail[code]++
+      })
+    })
+    return { groups, detail, total: Object.values(groups).reduce((a:any,b:any)=>a+b,0) }
+  }, [patrols])
+
   const toggleSubKategori = (code:string) => {
     const exists = selectedSubKategori.includes(code)
     let newSelected: string[]
@@ -464,6 +482,48 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
     }
   }
 
+  // V50 EXPORT EXCEL INTERNAL & GABUNGAN
+  const exportToExcel = (typeFilter: 'all' | PatrolType = 'all') => {
+    const dataSource = typeFilter === 'all' ? filteredPatrols : filteredPatrols.filter((p:any)=> (p.patrol_type||'internal')===typeFilter)
+    if (dataSource.length===0) { alert('Belum ada data patrol untuk di-export'); return }
+    // Build rows
+    const headers = ['Tgl Patrol','Jam','Type','No WP','Judul','Area','Vendor','Risk','Status','Peserta','Kategori Code','Kategori Label','Temuan','Tindakan','Foto Before','Foto After','Status Temuan']
+    const rows: any[][] = [headers]
+    dataSource.forEach((p:any)=>{
+      const list = p.temuan_list && p.temuan_list.length>0 ? p.temuan_list : [{ subKategoriCode:'-', subKategoriLabel:'-', temuan: p.temuan||'-', tindakan: p.tindakan||'-', peserta: p.petugas, status: p.status_patrol, fotoBeforeName:'', fotoAfterName:'' }]
+      list.forEach((t:any)=>{
+        rows.push([
+          p.tgl_patrol, p.jam_patrol, p.patrol_type, p.nomor_wp, p.judul_pekerjaan, p.area_name, p.vendor_name,
+          `${p.risk_level} ${p.risk_score}`, p.status_patrol, t.peserta||p.petugas, t.subKategoriCode, t.subKategoriLabel,
+          t.temuan, t.tindakan, t.fotoBeforeName||'', t.fotoAfterName||'', t.status||'open'
+        ])
+      })
+    })
+    // Convert to CSV (Excel compatible)
+    const csv = rows.map(r=> r.map(v=> `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `E-Patrol_${typeFilter}_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportFormTemuanToExcel = () => {
+    if (temuanList.length===0) { alert('Belum ada temuan di form'); return }
+    const headers = ['No','Peserta','Sub Kategori Code','Sub Kategori Label','Area','Temuan','Tindakan','Foto Before','Foto After','Status']
+    const rows = [headers, ...temuanList.map((t:any, i:number)=> [i+1, t.peserta, t.subKategoriCode, t.subKategoriLabel, t.area, t.temuan, t.tindakan, t.fotoBeforeName||'', t.fotoAfterName||'', t.status])]
+    const csv = rows.map(r=> r.map((v:any)=> `"${String(v||'').replace(/"/g,'""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `Form_E-Patrol_${patrolType}_${formData.nomor_wp}_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const kategoriByGroup = useMemo(()=>{
     const groups: any = {}
     KATEGORI_TEMUAN.forEach(k=>{
@@ -535,8 +595,33 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
         )}
       </div>
 
+      {/* V50 REKAP 4 ELEMEN */}
+      <div className="bg-white border-2 border-slate-200 rounded-xl p-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="font-black text-sm">📊 Rekapitulasi Temuan - 4 Elemen - Total {rekap4Elemen.total} Temuan - Internal {internalCount} Gabungan {gabunganCount}</h3>
+          <div className="flex gap-2">
+            <button onClick={()=>exportToExcel('internal')} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-bold">📥 Excel Internal</button>
+            <button onClick={()=>exportToExcel('gabungan')} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs font-bold">📥 Excel Gabungan</button>
+            <button onClick={()=>exportToExcel('all')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-bold">📥 Excel All</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-4 gap-3">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center"><p className="text-[11px] font-bold">1. Elemen CSMS</p><p className="font-black text-2xl text-blue-700">{rekap4Elemen.groups['1. Elemen CSMS']}</p><p className="text-[9px] mt-1">ADM {rekap4Elemen.detail['CSMS-ADM']} | COMP {rekap4Elemen.detail['CSMS-COMP']} | MOC {rekap4Elemen.detail['CSMS-MOC']}</p></div>
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center"><p className="text-[11px] font-bold">2. Fisik Lapangan</p><p className="font-black text-2xl text-orange-600">{rekap4Elemen.groups['2. Fisik Lapangan']}</p><p className="text-[9px] mt-1">APD {rekap4Elemen.detail['FISIK-APD']} | TOOLS {rekap4Elemen.detail['FISIK-TOOLS']} | HOUSE {rekap4Elemen.detail['FISIK-HOUSE']} | BARIKADE {rekap4Elemen.detail['FISIK-BARIKADE']} | EMER {rekap4Elemen.detail['FISIK-EMER']}</p></div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center"><p className="text-[11px] font-bold">3. Perilaku Pekerja</p><p className="font-black text-2xl text-yellow-600">{rekap4Elemen.groups['3. Perilaku Pekerja']}</p><p className="text-[9px] mt-1">SOP {rekap4Elemen.detail['PERILAKU-SOP']} | POSISI {rekap4Elemen.detail['PERILAKU-POSISI']} | DISIPLIN {rekap4Elemen.detail['PERILAKU-DISIPLIN']}</p></div>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center"><p className="text-[11px] font-bold">4. Tingkat Risiko</p><p className="font-black text-2xl text-red-600">{rekap4Elemen.groups['4. Tingkat Risiko']}</p><p className="text-[9px] mt-1">CRITICAL {rekap4Elemen.detail['RISK-CRITICAL']} | MAJOR {rekap4Elemen.detail['RISK-MAJOR']} | MINOR {rekap4Elemen.detail['RISK-MINOR']}</p></div>
+        </div>
+        <div className="mt-2 text-[10px] text-slate-500">Rekap otomatis dari temuan_list - cocok untuk laporan Mingguan Owner Area E, HSE Officer, Vendor Safety - bisa di-download Excel per type</div>
+      </div>
+
       <div className="bg-white border rounded-xl p-4">
-        <h3 className="font-black text-sm mb-2">History E-Patrol - {filteredPatrols.length} - Sync {lastSync}</h3>
+        <div className="flex justify-between items-center mb-2">
+          <h3 className="font-black text-sm">History E-Patrol - {filteredPatrols.length} - Sync {lastSync}</h3>
+          <div className="flex gap-2">
+            <button onClick={()=>exportToExcel('internal')} className="bg-blue-50 border border-blue-200 text-blue-700 px-3 py-1 rounded text-xs font-bold hover:bg-blue-100">📥 Internal</button>
+            <button onClick={()=>exportToExcel('gabungan')} className="bg-purple-50 border border-purple-200 text-purple-700 px-3 py-1 rounded text-xs font-bold hover:bg-purple-100">📥 Gabungan</button>
+          </div>
+        </div>
         <div className="overflow-auto max-h-[400px] border rounded-lg">
           <table className="w-full text-xs"><thead><tr className="bg-slate-800 text-white"><th className="p-2 text-left">Tgl/Jam + Type</th><th className="p-2 text-left">No WP + Risk</th><th className="p-2 text-left">Peserta + Kategori</th><th className="p-2 text-left">Temuan + Foto Before + Tindakan + Foto After</th></tr></thead>
             <tbody>
@@ -575,12 +660,15 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
               <div><div className="font-black text-sm flex items-center gap-2">
                     <span>{patrolType==='gabungan'?'🟣 Form E-Patrol Gabungan V41':'🔵 Form E-Patrol Internal'} - {formData.nomor_wp} - {formData.judul_pekerjaan}</span>
                   </div></div>
-              <button onClick={()=>{
+              <div className="flex gap-2">
+                <button onClick={exportFormTemuanToExcel} className="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-1">📥 Download Excel {patrolType==='gabungan'?'Gabungan':'Internal'}</button>
+                <button onClick={()=>{
                 setShowForm(false)
                 localStorage.removeItem('pendingPatrol')
                 localStorage.removeItem('patrol_wp_filter')
                 localStorage.removeItem('patrol_mode')
               }} className="bg-white/20 px-3 py-1 rounded text-xs">✕ Tutup</button>
+              </div>
             </div>
             <div className="p-4 space-y-4 text-xs overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-2">
