@@ -204,7 +204,7 @@ export default function App(){
           {activeMenu==='vendors' && <Vendor8Elemen areas={areas} useVendorsHook={useVendorsHook} />}
           {activeMenu==='workpermit' && <EWorkPermitFlow areas={areas} vendors={vendors} useWorkPermitsHook={useWorkPermitsHook} />}
           {activeMenu==='mapping' && <MappingOverlap permits={permits} vendors={vendors} />}
-          {activeMenu==='patrol' && <EPatrolSync permits={permits} usePatrolsHook={usePatrolsHook} />}
+          {activeMenu==='patrol' && <EPatrolSync permits={permits} usePatrolsHook={usePatrolsHook} areas={areas} vendors={vendors} />}
           {activeMenu==='scoring' && <FinalScoringSync vendors={vendors} permits={permits} patrols={patrols} />}
         </main>
       </div>

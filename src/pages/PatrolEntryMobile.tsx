@@ -11,7 +11,7 @@ export default function PatrolEntryMobile({ initialParams, permits, onChoose, pr
   const judul = initialParams?.judul || 'TEST STRIC AREA E'
   const today = new Date().toISOString().slice(0,10)
 
-  const [nama, setNama] = useState(profile?.full_name || profile?.email || '')
+  const [nama, setNama] = useState('') // V43 FIX - Nama peserta patrol TEXT kosong, bukan email - biar bisa beda2 nama di lapangan
   const [jabatan, setJabatan] = useState('Helper')
   const [bagian, setBagian] = useState('Area E')
   const [tglPatrol, setTglPatrol] = useState(today)
@@ -28,9 +28,17 @@ export default function PatrolEntryMobile({ initialParams, permits, onChoose, pr
   },[wp])
 
   const handleJoin = (mode:'internal'|'gabungan') => {
-    const peserta = { nama, jabatan, bagian, tglPatrol, wp, joinedAt: new Date().toISOString() }
+    if(!nama || nama.trim().length<2){
+      alert('Nama Peserta Patrol wajib diisi text (bukan email)')
+      return
+    }
+    if(nama.includes('@')){
+      alert('Jangan isi email - Isi Nama Peserta Patrol text contoh: Budi Owner Area')
+      return
+    }
+    const peserta = { nama: nama.trim(), jabatan, bagian, tglPatrol, wp, joinedAt: new Date().toISOString() }
     const list = [...pesertaList]
-    if(!list.find(p=>p.nama===nama)){
+    if(!list.find(p=>p.nama.toLowerCase()===nama.trim().toLowerCase())){
       list.push(peserta)
     }
     setPesertaList(list)
@@ -73,7 +81,7 @@ export default function PatrolEntryMobile({ initialParams, permits, onChoose, pr
           <div className="space-y-3">
             <div>
               <label className="text-[11px] font-bold">Nama Peserta Patrol</label>
-              <input value={nama} onChange={e=>setNama(e.target.value)} placeholder="Nama lengkap" className="w-full border-2 border-black rounded-lg px-3 py-2 text-[14px] mt-1" />
+              <input value={nama} onChange={e=>setNama(e.target.value)} placeholder="Contoh: Budi Owner Area E - WAJIB isi nama text, bukan email" className="w-full border-2 border-black rounded-lg px-3 py-2 text-[14px] mt-1" />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
