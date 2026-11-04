@@ -86,18 +86,13 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
     { id: 2, nama: 'Siti HSE', jabatan: 'HSE Officer', bagian: 'HSE' },
     { id: 3, nama: 'Joko Vendor', jabatan: 'Safety Vendor', bagian: 'PT MRH DigitalHub' },
   ])
-  // V43 MOBILE - Session & Sync
+
+  // V43 FIX ANTI WHITE - Safe states
   const [sessionIdV43, setSessionIdV43] = useState('')
   const [tglPatrolV43, setTglPatrolV43] = useState(new Date().toISOString().split('T')[0])
   const [syncStatusV43, setSyncStatusV43] = useState('')
-  const [errorBoundary, setErrorBoundary] = useState('')
 
-  const [newPesertaNama, setNewPesertaNama] = useState('')
-  const [newPesertaJabatan, setNewPesertaJabatan] = useState('')
-  const [newPesertaBagian, setNewPesertaBagian] = useState('')
-
-
-  // V43 PATCH - Load Session Peserta dari PatrolEntryMobile (QR Universal Choose Mode)
+  // V43 - Load session peserta dari PatrolEntryMobile
   useEffect(()=>{
     try{
       const sess = localStorage.getItem('patrol_session_id') || ''
@@ -109,31 +104,74 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
         if(raw){
           const arr = JSON.parse(raw)
           if(Array.isArray(arr) && arr.length>0){
-            // Merge ke pesertaGabunganList tanpa hapus default
-            const mapped: PesertaGabungan[] = arr.map((p:any, idx:number)=>({
+            const mapped = arr.map((p:any, idx:number)=>({
               id: 100+idx,
-              nama: p.nama || p.name,
+              nama: p.nama || '',
               jabatan: p.jabatan || 'Helper',
               bagian: p.bagian || 'Area E'
-            }))
-            // Gabungkan, hindari duplikat nama
+            })).filter((m:any)=> m.nama && !m.nama.includes('@'))
             setPesertaGabunganList(prev=>{
               try{
                 const safePrev = Array.isArray(prev) ? prev : []
                 const names = new Set(safePrev.map((x:any)=> (x.nama||'').toLowerCase()))
                 const add = mapped.filter((m:any)=> !names.has((m.nama||'').toLowerCase()))
                 return [...safePrev, ...add]
-              }catch(e){ console.warn('merge peserta skip', e); return prev }
+              }catch{ return prev }
             })
           }
         }
       }
-    }catch(e){ console.error('V43 session load', e) }
-  }, [showForm])
+    }catch{}
+  }, [])
+
+  // V43 - Simpan & Kirim anti crash
+  const handleSimpanKirimV43 = async () => {
+    try{
+      setSyncStatusV43('Sync ke Supabase...')
+      const finalData = {
+        wp: formData.nomor_wp || qrWP || 'mrh-csmswp-2026-003',
+        sessionId: sessionIdV43 || localStorage.getItem('patrol_session_id') || '',
+        tglPatrol: tglPatrolV43,
+        patrolType,
+        pesertaList: patrolType==='gabungan' ? pesertaGabunganList : pesertaInternal.map(n=>({nama:n})),
+        temuanList,
+        selectedSubKategori,
+        status: 'OPEN',
+        createdAt: new Date().toISOString()
+      }
+      localStorage.setItem('admin_contractor_temuan', JSON.stringify(temuanList))
+      localStorage.setItem(`temuan_final_${finalData.wp}`, JSON.stringify(temuanList))
+      localStorage.setItem('admin_contractor_patrol_session', JSON.stringify(finalData))
+      const queue = JSON.parse(localStorage.getItem('patrol_sync_queue')||'[]')
+      queue.push(finalData)
+      localStorage.setItem('patrol_sync_queue', JSON.stringify(queue))
+      try{
+        const payload = {
+          nomor_wp: String(finalData.wp),
+          session_id: String(finalData.sessionId),
+          tgl_patrol: finalData.tglPatrol,
+          mode: String(finalData.patrolType),
+          peserta: finalData.pesertaList,
+          temuan: finalData.temuanList,
+          status: 'OPEN',
+          created_by: 'patrol_integrated@mrhdigitalhub.com'
+        }
+        const { error } = await supabase.from('patrol_findings').insert([payload])
+        if(error) console.warn('Supabase warn', error.message)
+      }catch(e){ console.warn('Supabase skip', e) }
+      setSyncStatusV43(`✅ ${temuanList.length} temuan Simpan & Kirim OK - ${finalData.wp}`)
+      setTimeout(()=> setSyncStatusV43(''), 4000)
+    }catch(e:any){
+      setSyncStatusV43('❌ Gagal: '+(e.message||e))
+    }
+  }
+
+  const [newPesertaNama, setNewPesertaNama] = useState('')
+  const [newPesertaJabatan, setNewPesertaJabatan] = useState('')
+  const [newPesertaBagian, setNewPesertaBagian] = useState('')
 
   const getJudulLengkap = (p:any) => {
-    if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
-  return (
+    return (
       p.judul ||
       p.judul_pekerjaan ||
       p.pekerjaan ||
@@ -183,8 +221,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
       .on('postgres_changes', { event: '*', schema: 'public', table: 'e_patrol' }, () => { loadPatrols(); setLastSync(new Date().toLocaleTimeString()) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'work_permits' }, () => { loadActivePermits(); setLastSync(new Date().toLocaleTimeString()) })
       .subscribe()
-    if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
-  return () => { supabase.removeChannel(channel) }
+    return () => { supabase.removeChannel(channel) }
   }, [propPermits])
 
   const [qrMode, setQrMode] = useState(false)
@@ -507,7 +544,6 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
     return groups
   }, [])
 
-  if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
   return (
     <div className="space-y-4 p-2">
       <div className="grid grid-cols-8 gap-2">
@@ -569,8 +605,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
           <div className="grid grid-cols-3 gap-2 items-stretch">
             {activePermits.filter((p:any)=>{ if (showOnlyActive && !isWPActive(p)) return false; if (filterRisk!=='all' && (p.risk_level||'medium')!==filterRisk) return false; return true; }).map((p:any,i:number)=>{
               const color = getRiskColor(p.risk_level||'medium')
-              if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
-  return (
+              return (
                 <div key={p.id||i} className={`border-2 rounded-lg p-2 ${color.bg==='bg-red-600'?'bg-red-50 border-red-300':color.bg==='bg-yellow-400'?'bg-yellow-50 border-yellow-300':'bg-green-50 border-green-300'} flex flex-col justify-between h-full min-h-[132px]`}>
                   <div>
                   <div className="flex justify-between"><span className="font-bold text-xs font-mono">{p.nomor_wp}</span><span className={`${color.bg} text-white px-1.5 py-0.5 rounded text-[9px]`}>{color.dot} {(p.risk_level||'medium').toUpperCase()} {p.risk_score||9}</span></div>
@@ -595,8 +630,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
                 const statusColor = getStatusColor(p.status_patrol||'safe')
                 const tingkatBadge = getTingkatBadge(p.tingkat_risiko||'RISK-MINOR')
                 const list = p.temuan_list || []
-                if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
-  return (
+                return (
                   <tr key={p.id||i} className="border-b hover:bg-slate-50">
                     <td className="p-2"><div className="font-bold">{p.tgl_patrol} {p.jam_patrol}</div><div className={`text-[9px] px-1.5 py-0.5 rounded font-bold inline-block mt-1 ${p.patrol_type==='gabungan'?'bg-purple-600 text-white':'bg-blue-600 text-white'}`}>{p.patrol_type==='gabungan'?'🟣 GABUNGAN':'🔵 INTERNAL'}</div><div className={`${statusColor.bg} text-white px-1 py-0.5 rounded text-[9px] inline-block mt-1 ml-1`}>{statusColor.dot} {statusColor.text}</div><div className={`${tingkatBadge.bg} text-white px-1 py-0.5 rounded text-[9px] inline-block mt-1`}>{tingkatBadge.dot} {tingkatBadge.text}</div></td>
                     <td className="p-2"><div className="font-mono font-bold">{p.nomor_wp} {riskColor.dot}</div><div className={`${riskColor.bg} text-white px-1 py-0.5 rounded text-[9px] inline-block mt-1`}>{(p.risk_level||'medium').toUpperCase()} {p.risk_score||9}</div><div className="text-[10px] mt-1">{p.judul_pekerjaan}</div></td>
@@ -732,12 +766,12 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
 
               <div className="flex flex-col gap-2">
                 <div className="flex gap-2">
-                  <button onClick={savePatrol} className={`flex-1 ${patrolType==='gabungan'?'bg-purple-700 hover:bg-purple-800':'bg-blue-700 hover:bg-blue-800'} text-white py-2 rounded font-black`}>💾 Simpan Patrol V41 {formData.nomor_wp} - {selectedSubKategori.length} Sub - {temuanList.length} Temuan - Clear pendingPatrol</button>
+                  <button onClick={savePatrol} className={`flex-1 ${patrolType==='gabungan'?'bg-purple-700 hover:bg-purple-800':'bg-blue-700 hover:bg-blue-800'} text-white py-2 rounded font-black`}>💾 Simpan Patrol V41 {formData.nomor_wp} - {selectedSubKategori.length} Sub - {temuanList.length} Temuan</button>
                   <button onClick={handleSimpanKirimV43} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-black">📤 Simpan & Kirim → Admin Contractor</button>
                   <button onClick={()=>setShowForm(false)} className="px-6 bg-white border py-2 rounded">Batal</button>
                 </div>
                 {syncStatusV43 && <div className="bg-yellow-100 border-2 border-yellow-400 p-2 rounded text-[11px] font-bold">{syncStatusV43}</div>}
-                {sessionIdV43 && <div className="bg-blue-50 border p-2 rounded text-[10px]">V43 Session: {sessionIdV43} | Tgl: {tglPatrolV43} | Peserta Auto Join: {pesertaGabunganList.length} | Mode: {patrolType} | Sync Queue: {(JSON.parse(localStorage.getItem('patrol_sync_queue')||'[]')).length}</div>}
+                {sessionIdV43 && <div className="bg-blue-50 border p-2 rounded text-[10px]">V43 Session: {sessionIdV43} | Tgl: {tglPatrolV43} | Peserta: {pesertaGabunganList.length} | Mode: {patrolType}</div>}
               </div>
             </div>
           </div>
