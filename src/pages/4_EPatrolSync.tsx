@@ -575,7 +575,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
 
       {showForm && (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2">
-      <div className="bg-white rounded-xl w-full max-w-6xl max-h- overflow-auto">
+      <div className="bg-white rounded-xl w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden">
       <div className={`${patrolType==='gabungan'?'bg-purple-700':'bg-blue-700'} text-white p-4 flex justify-between items-center`}>
       <div><div className="font-black text-sm flex items-center gap-2">
       <span>{patrolType==='gabungan'?'🟣 Form E-Patrol Gabungan V41':'🔵 Form E-Patrol Internal'} - {formData.nomor_wp} - {formData.judul_pekerjaan}</span>
