@@ -90,6 +90,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   const [sessionIdV43, setSessionIdV43] = useState('')
   const [tglPatrolV43, setTglPatrolV43] = useState(new Date().toISOString().split('T')[0])
   const [syncStatusV43, setSyncStatusV43] = useState('')
+  const [errorBoundary, setErrorBoundary] = useState('')
 
   const [newPesertaNama, setNewPesertaNama] = useState('')
   const [newPesertaJabatan, setNewPesertaJabatan] = useState('')
@@ -117,9 +118,12 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
             }))
             // Gabungkan, hindari duplikat nama
             setPesertaGabunganList(prev=>{
-              const names = new Set(prev.map(x=>x.nama.toLowerCase()))
-              const add = mapped.filter(m=>!names.has(m.nama.toLowerCase()))
-              return [...prev, ...add]
+              try{
+                const safePrev = Array.isArray(prev) ? prev : []
+                const names = new Set(safePrev.map((x:any)=> (x.nama||'').toLowerCase()))
+                const add = mapped.filter((m:any)=> !names.has((m.nama||'').toLowerCase()))
+                return [...safePrev, ...add]
+              }catch(e){ console.warn('merge peserta skip', e); return prev }
             })
           }
         }
@@ -128,7 +132,8 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   }, [showForm])
 
   const getJudulLengkap = (p:any) => {
-    return (
+    if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
+  return (
       p.judul ||
       p.judul_pekerjaan ||
       p.pekerjaan ||
@@ -178,7 +183,8 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
       .on('postgres_changes', { event: '*', schema: 'public', table: 'e_patrol' }, () => { loadPatrols(); setLastSync(new Date().toLocaleTimeString()) })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'work_permits' }, () => { loadActivePermits(); setLastSync(new Date().toLocaleTimeString()) })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
+  return () => { supabase.removeChannel(channel) }
   }, [propPermits])
 
   const [qrMode, setQrMode] = useState(false)
@@ -501,6 +507,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
     return groups
   }, [])
 
+  if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
   return (
     <div className="space-y-4 p-2">
       <div className="grid grid-cols-8 gap-2">
@@ -562,7 +569,8 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
           <div className="grid grid-cols-3 gap-2 items-stretch">
             {activePermits.filter((p:any)=>{ if (showOnlyActive && !isWPActive(p)) return false; if (filterRisk!=='all' && (p.risk_level||'medium')!==filterRisk) return false; return true; }).map((p:any,i:number)=>{
               const color = getRiskColor(p.risk_level||'medium')
-              return (
+              if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
+  return (
                 <div key={p.id||i} className={`border-2 rounded-lg p-2 ${color.bg==='bg-red-600'?'bg-red-50 border-red-300':color.bg==='bg-yellow-400'?'bg-yellow-50 border-yellow-300':'bg-green-50 border-green-300'} flex flex-col justify-between h-full min-h-[132px]`}>
                   <div>
                   <div className="flex justify-between"><span className="font-bold text-xs font-mono">{p.nomor_wp}</span><span className={`${color.bg} text-white px-1.5 py-0.5 rounded text-[9px]`}>{color.dot} {(p.risk_level||'medium').toUpperCase()} {p.risk_score||9}</span></div>
@@ -587,7 +595,8 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
                 const statusColor = getStatusColor(p.status_patrol||'safe')
                 const tingkatBadge = getTingkatBadge(p.tingkat_risiko||'RISK-MINOR')
                 const list = p.temuan_list || []
-                return (
+                if(errorBoundary) return <div className="p-6 bg-red-50 border-2 border-red-500 rounded">Error: {errorBoundary} - <button onClick={()=>setErrorBoundary('')} className="bg-black text-white px-3 py-1 rounded">Tutup</button></div>
+  return (
                   <tr key={p.id||i} className="border-b hover:bg-slate-50">
                     <td className="p-2"><div className="font-bold">{p.tgl_patrol} {p.jam_patrol}</div><div className={`text-[9px] px-1.5 py-0.5 rounded font-bold inline-block mt-1 ${p.patrol_type==='gabungan'?'bg-purple-600 text-white':'bg-blue-600 text-white'}`}>{p.patrol_type==='gabungan'?'🟣 GABUNGAN':'🔵 INTERNAL'}</div><div className={`${statusColor.bg} text-white px-1 py-0.5 rounded text-[9px] inline-block mt-1 ml-1`}>{statusColor.dot} {statusColor.text}</div><div className={`${tingkatBadge.bg} text-white px-1 py-0.5 rounded text-[9px] inline-block mt-1`}>{tingkatBadge.dot} {tingkatBadge.text}</div></td>
                     <td className="p-2"><div className="font-mono font-bold">{p.nomor_wp} {riskColor.dot}</div><div className={`${riskColor.bg} text-white px-1 py-0.5 rounded text-[9px] inline-block mt-1`}>{(p.risk_level||'medium').toUpperCase()} {p.risk_score||9}</div><div className="text-[10px] mt-1">{p.judul_pekerjaan}</div></td>
