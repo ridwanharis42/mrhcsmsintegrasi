@@ -1,4 +1,3 @@
-
 import { useMemo, useState } from 'react'
 
 type Props = {
@@ -42,9 +41,9 @@ const getQRFormPatrol = (permit:any, baseUrl: string) => {
 }
 
 export function WorkPermitPrintA4({ permit, appSettings, onClose }: Props) {
-  // FIX IPv4: 192.168.137.1 dari Command Prompt ipconfig - Pasang di Ln 35
-  // Ln 35 - Base URL untuk QR2 - Ganti localhost dengan IPv4 agar HP bisa buka
-  const [baseUrl, setBaseUrl] = useState('http://192.168.137.1:5173')
+  // V42 FIX HARDCODE VERCEL PROD - Ln 44 PATCH - Agar scan HP tidak timeout - IPv4 hanya untuk local dev
+  // Sebelumnya Ln 47-62 auto-detect origin, sekarang hardcode Vercel prod langsung
+  const [baseUrl, setBaseUrl] = useState('https://mrhcsmsintegrasi.vercel.app')
 
   const qrDataWP = useMemo(()=> getQRDataWP(permit), [permit])
   const qrFormPatrol = useMemo(()=> getQRFormPatrol(permit, baseUrl), [permit, baseUrl])
@@ -58,8 +57,8 @@ export function WorkPermitPrintA4({ permit, appSettings, onClose }: Props) {
         <div className="flex items-center gap-2">
           <div className="h-10 w-10 bg-white rounded flex items-center justify-center font-black text-[#0f172a] text-xs">MRH</div>
           <div>
-            <div className="font-black text-sm">PT MRH DigitalHub - CSMS INTEGRATED - WORK PERMIT</div>
-            <div className="text-[11px]">No WP: {permit.nomor_wp} | {permit.judul} | Risk {permit.risk_level} {permit.risk_score} | {permit.area_name} | 0 Problems | IPv4 192.168.137.1</div>
+            <div className="font-black text-sm">PT MRH DigitalHub - CSMS INTEGRATED - WORK PERMIT - V42 HARDCODE VERCEL</div>
+            <div className="text-[11px]">No WP: {permit.nomor_wp} | {permit.judul} | Risk {permit.risk_level} {permit.risk_score} | {permit.area_name} | 0 Problems | {baseUrl}</div>
           </div>
         </div>
         {onClose && <button onClick={onClose} className="bg-white text-black px-3 py-1 rounded text-xs font-bold">X Tutup</button>}
@@ -105,43 +104,40 @@ export function WorkPermitPrintA4({ permit, appSettings, onClose }: Props) {
         <tbody>{kendaraan.map((k:any,i:number)=><tr key={i}><td className="border border-black px-1 text-center">{i+1}</td><td className="border border-black px-1">{k.nama}</td><td className="border border-black px-1 text-center">{k.tonase||'20 Ton'}</td><td className="border border-black px-1 text-center">{k.silo||k.no_silo||'-'}</td><td className="border border-black px-1 text-center">{k.qty_op||k.operator||1}</td></tr>)}</tbody>
       </table>
 
-      <div className="mt-3 bg-blue-100 border-2 border-blue-600 rounded p-2">
-        <div className="font-black text-[11px]">Ln 35 FIX IPv4 192.168.137.1 - Base URL QR2 - Agar HP Bisa Buka - Pasang di sini</div>
+      <div className="mt-3 bg-green-100 border-2 border-green-600 rounded p-2">
+        <div className="font-black text-[11px]">V42 HARDCODE VERCEL PROD - Ln 44 FIX - Scan tidak timeout lagi</div>
         <div className="mt-2 flex gap-2 items-center flex-wrap">
-          <div className="text-[11px] font-bold">Base URL QR2 - Ln 35:</div>
-          <input type="text" value={baseUrl} onChange={e=>setBaseUrl(e.target.value)} className="border-2 border-black px-2 py-1 text-[11px] w-[300px] font-mono bg-white" />
-          <div className="text-[10px]">IPv4 dari CMD ipconfig: 192.168.137.1 - Subnet 255.255.255.0 - Gateway kosong - Media disconnected Wi-Fi - Local Area Connection 10 IPv4 192.168.137.1</div>
+          <div className="text-[11px] font-bold">Base URL QR2 - Ln 44 Hardcode Vercel Prod:</div>
+          <input type="text" value={baseUrl} onChange={e=>setBaseUrl(e.target.value)} className="border-2 border-black px-2 py-1 text-[11px] w-[350px] font-mono bg-white" />
+          <button onClick={()=> setBaseUrl('https://mrhcsmsintegrasi.vercel.app')} className="bg-blue-600 text-white px-3 py-1 rounded text-[10px] font-bold">Set ke Vercel Prod</button>
+          <div className="text-[10px]">Vercel Prod = https://mrhcsmsintegrasi.vercel.app - HP scan langsung bisa, tidak butuh WiFi sama - IPv4 192.168.137.1 hanya untuk dev local</div>
         </div>
         <div className="mt-2 text-[10px] font-mono bg-white border p-1 rounded break-all">QR2 URL: {qrFormPatrol}</div>
-        <div className="mt-1 text-[9px]">Cara: CMD ipconfig - IPv4 192.168.137.1 - Pasang di Ln 35 const baseUrl useState http 192.168.137.1 5173 - HP dan PC WiFi sama - HP scan QR2 - Bisa dibuka - Form E-Patrol Gabungan muncul</div>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
         <div className="border-2 border-black rounded p-3 bg-yellow-50 text-center">
-          <div className="font-black text-[13px] bg-black text-white py-1 px-2 rounded">QR 1 DATA WP Verifikasi TEXT BISA</div>
+          <div className="font-black text-[13px] bg-black text-white py-1 px-2 rounded">QR 1 DATA WP Verifikasi TEXT BISA - 200x200</div>
           <div className="mt-3 flex justify-center">
             <QRImg value={qrDataWP} size={200} />
           </div>
           <div className="text-[10px] font-bold mt-2">No WP: {permit.nomor_wp}</div>
           <div className="text-[9px] mt-1 text-left bg-white border p-2 rounded font-mono whitespace-pre-wrap">{qrDataWP}</div>
-          <div className="text-[9px] mt-2 font-black text-left">QR1 Text Tidak butuh internet Scan langsung muncul data Jadi bisa Verifikasi lapangan</div>
         </div>
 
         <div className="border-2 border-blue-600 rounded p-3 bg-blue-50 text-center">
-          <div className="font-black text-[13px] bg-blue-600 text-white py-1 px-2 rounded">QR 2 FORM E-PATROL 4 ELEMEN Universal URL FIX IPv4</div>
+          <div className="font-black text-[13px] bg-blue-600 text-white py-1 px-2 rounded">QR 2 FORM E-PATROL GABUNGAN Universal V42 - 200x200 - HARDCODE VERCEL - NO TIMEOUT</div>
           <div className="mt-3 flex justify-center">
             <QRImg value={qrFormPatrol} size={200} />
           </div>
-          <div className="text-[10px] font-bold mt-2">Form Patrol: {permit.nomor_wp}</div>
+          <div className="text-[10px] font-bold mt-2">Form Patrol: {permit.nomor_wp} - Auto Open Gabungan</div>
           <div className="text-[8px] mt-1 text-left bg-white border p-1 rounded font-mono break-all">{qrFormPatrol}</div>
-          <div className="text-[9px] mt-2 font-black text-left">QR2 URL Butuh server localhost tidak bisa di HP Ganti dengan IPv4 192.168.137.1 Ln 35</div>
-          <div className="text-[9px] mt-1 text-left">Scan HP Auto-open Form E-Patrol Gabungan {permit.nomor_wp} Input Manual Nama Peserta Jabatan Bagian</div>
-          <div className="text-[9px] mt-1 text-left">Centang 4 Kelompok 1 CSMS 2 Fisik 3 Perilaku 4 Risk Upload Foto Before After Sync File 4 E-Patrol</div>
-          <div className="text-[8px] mt-1 font-bold text-left">Ukuran 200x200 Universal Bisa dipakai semua peserta Pasang IPv4 di Ln 35</div>
+          <div className="text-[9px] mt-2 font-black text-left">QR2 Vercel Prod: https://mrhcsmsintegrasi.vercel.app/?patrol=1&wp=...&mode=gabungan&autoOpen=1</div>
+          <div className="text-[9px] mt-1 text-left">Scan HP → Login → Auto ke menu 4. E-Patrol (Sync) → Form Gabungan Input Manual Nama Peserta Jabatan Bagian auto-muncul V42</div>
         </div>
       </div>
 
-      <div className="mt-2 text-[8px] text-gray-500 text-center">V30 Ln35 IPv4 192.168.137.1:5173 FIX QR2 Tidak Bisa di HP - Ganti localhost dengan IPv4 - 2 QR Besar 200x200 - 0 Problems - PT MRH DigitalHub - CSMS INTEGRATED</div>
+      <div className="mt-2 text-[8px] text-gray-500 text-center">V42 HARDCODE VERCEL Ln44 - QR2 Scan No Timeout - 2 QR Besar 200x200 - 0 Problems - PT MRH DigitalHub - CSMS INTEGRATED - Build SUCCESS</div>
     </div>
   )
 }
