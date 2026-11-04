@@ -330,11 +330,11 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   const internalCount = patrols.filter(p=>(p.patrol_type||'internal')==='internal').length
   const gabunganCount = patrols.filter(p=>p.patrol_type==='gabungan').length
 
-  // V50 REKAP 4 ELEMEN
-  const rekap4Elemen = useMemo(()=>{
+  // V51 REKAP 8 KOTAK - 4 INTERNAL + 4 GABUNGAN
+  const calcRekap = (data: any[]) => {
     const groups = { '1. Elemen CSMS': 0, '2. Fisik Lapangan': 0, '3. Perilaku Pekerja': 0, '4. Tingkat Risiko': 0 }
     const detail: any = { 'CSMS-ADM':0, 'CSMS-COMP':0, 'CSMS-MOC':0, 'FISIK-APD':0, 'FISIK-TOOLS':0, 'FISIK-HOUSE':0, 'FISIK-BARIKADE':0, 'FISIK-EMER':0, 'PERILAKU-SOP':0, 'PERILAKU-POSISI':0, 'PERILAKU-DISIPLIN':0, 'RISK-CRITICAL':0, 'RISK-MAJOR':0, 'RISK-MINOR':0 }
-    patrols.forEach((p:any)=>{
+    data.forEach((p:any)=>{
       const list = p.temuan_list || []
       list.forEach((t:any)=>{
         const code = t.subKategoriCode||''
@@ -345,8 +345,11 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
         if (detail[code]!==undefined) detail[code]++
       })
     })
-    return { groups, detail, total: Object.values(groups).reduce((a:any,b:any)=>a+b,0) }
-  }, [patrols])
+    return { groups, detail, total: (Object.values(groups) as number[]).reduce((a,b)=>a+b,0) }
+  }
+  const rekapInternal = useMemo(()=> calcRekap(patrols.filter((p:any)=>(p.patrol_type||'internal')==='internal')), [patrols])
+  const rekapGabungan = useMemo(()=> calcRekap(patrols.filter((p:any)=>p.patrol_type==='gabungan')), [patrols])
+  const rekapAll = useMemo(()=> calcRekap(patrols), [patrols])
 
   const toggleSubKategori = (code:string) => {
     const exists = selectedSubKategori.includes(code)
@@ -595,23 +598,40 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
         )}
       </div>
 
-      {/* V50 REKAP 4 ELEMEN */}
-      <div className="bg-white border-2 border-slate-200 rounded-xl p-4">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-black text-sm">📊 Rekapitulasi Temuan - 4 Elemen - Total {rekap4Elemen.total} Temuan - Internal {internalCount} Gabungan {gabunganCount}</h3>
+      {/* V51 REKAP 8 KOTAK - 4 INTERNAL + 4 GABUNGAN */}
+      <div className="bg-white border-2 border-slate-200 rounded-xl p-4 space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="font-black text-sm">📊 Rekapitulasi Temuan - 8 Kotak - Total {rekapAll.total} Temuan - Int {internalCount} Gab {gabunganCount}</h3>
           <div className="flex gap-2">
-            <button onClick={()=>exportToExcel('internal')} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-bold">📥 Excel Internal</button>
-            <button onClick={()=>exportToExcel('gabungan')} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs font-bold">📥 Excel Gabungan</button>
-            <button onClick={()=>exportToExcel('all')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-bold">📥 Excel All</button>
+            <button onClick={()=>exportToExcel('internal')} className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold">📥 Excel Internal ({rekapInternal.total})</button>
+            <button onClick={()=>exportToExcel('gabungan')} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-xs font-bold">📥 Excel Gabungan ({rekapGabungan.total})</button>
+            <button onClick={()=>exportToExcel('all')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded text-xs font-bold">📥 Excel All ({rekapAll.total})</button>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-3">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center"><p className="text-[11px] font-bold">1. Elemen CSMS</p><p className="font-black text-2xl text-blue-700">{rekap4Elemen.groups['1. Elemen CSMS']}</p><p className="text-[9px] mt-1">ADM {rekap4Elemen.detail['CSMS-ADM']} | COMP {rekap4Elemen.detail['CSMS-COMP']} | MOC {rekap4Elemen.detail['CSMS-MOC']}</p></div>
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center"><p className="text-[11px] font-bold">2. Fisik Lapangan</p><p className="font-black text-2xl text-orange-600">{rekap4Elemen.groups['2. Fisik Lapangan']}</p><p className="text-[9px] mt-1">APD {rekap4Elemen.detail['FISIK-APD']} | TOOLS {rekap4Elemen.detail['FISIK-TOOLS']} | HOUSE {rekap4Elemen.detail['FISIK-HOUSE']} | BARIKADE {rekap4Elemen.detail['FISIK-BARIKADE']} | EMER {rekap4Elemen.detail['FISIK-EMER']}</p></div>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center"><p className="text-[11px] font-bold">3. Perilaku Pekerja</p><p className="font-black text-2xl text-yellow-600">{rekap4Elemen.groups['3. Perilaku Pekerja']}</p><p className="text-[9px] mt-1">SOP {rekap4Elemen.detail['PERILAKU-SOP']} | POSISI {rekap4Elemen.detail['PERILAKU-POSISI']} | DISIPLIN {rekap4Elemen.detail['PERILAKU-DISIPLIN']}</p></div>
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center"><p className="text-[11px] font-bold">4. Tingkat Risiko</p><p className="font-black text-2xl text-red-600">{rekap4Elemen.groups['4. Tingkat Risiko']}</p><p className="text-[9px] mt-1">CRITICAL {rekap4Elemen.detail['RISK-CRITICAL']} | MAJOR {rekap4Elemen.detail['RISK-MAJOR']} | MINOR {rekap4Elemen.detail['RISK-MINOR']}</p></div>
+
+        {/* ROW 1 - INTERNAL */}
+        <div>
+          <div className="flex items-center gap-2 mb-2"><span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded">PATROL INTERNAL - {rekapInternal.total} Temuan</span><span className="text-[10px] text-slate-500">sync dengan tombol Excel Internal</span></div>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3 text-center"><p className="text-[11px] font-black">1. Elemen CSMS</p><p className="font-black text-2xl text-blue-700">{rekapInternal.groups['1. Elemen CSMS']}</p><p className="text-[9px] mt-1">ADM {rekapInternal.detail['CSMS-ADM']} | COMP {rekapInternal.detail['CSMS-COMP']} | MOC {rekapInternal.detail['CSMS-MOC']}</p></div>
+            <div className="bg-orange-50 border-2 border-orange-300 rounded-lg p-3 text-center"><p className="text-[11px] font-black">2. Fisik Lapangan</p><p className="font-black text-2xl text-orange-600">{rekapInternal.groups['2. Fisik Lapangan']}</p><p className="text-[9px] mt-1">APD {rekapInternal.detail['FISIK-APD']} | TOOLS {rekapInternal.detail['FISIK-TOOLS']} | HOUSE {rekapInternal.detail['FISIK-HOUSE']} | BARIKADE {rekapInternal.detail['FISIK-BARIKADE']} | EMER {rekapInternal.detail['FISIK-EMER']}</p></div>
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3 text-center"><p className="text-[11px] font-black">3. Perilaku Pekerja</p><p className="font-black text-2xl text-yellow-600">{rekapInternal.groups['3. Perilaku Pekerja']}</p><p className="text-[9px] mt-1">SOP {rekapInternal.detail['PERILAKU-SOP']} | POSISI {rekapInternal.detail['PERILAKU-POSISI']} | DISIPLIN {rekapInternal.detail['PERILAKU-DISIPLIN']}</p></div>
+            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-3 text-center"><p className="text-[11px] font-black">4. Tingkat Risiko</p><p className="font-black text-2xl text-red-600">{rekapInternal.groups['4. Tingkat Risiko']}</p><p className="text-[9px] mt-1">CRITICAL {rekapInternal.detail['RISK-CRITICAL']} | MAJOR {rekapInternal.detail['RISK-MAJOR']} | MINOR {rekapInternal.detail['RISK-MINOR']}</p></div>
+          </div>
         </div>
-        <div className="mt-2 text-[10px] text-slate-500">Rekap otomatis dari temuan_list - cocok untuk laporan Mingguan Owner Area E, HSE Officer, Vendor Safety - bisa di-download Excel per type</div>
+
+        {/* ROW 2 - GABUNGAN */}
+        <div>
+          <div className="flex items-center gap-2 mb-2"><span className="bg-purple-600 text-white text-[10px] font-black px-2 py-0.5 rounded">PATROL GABUNGAN - {rekapGabungan.total} Temuan</span><span className="text-[10px] text-slate-500">Owner Area E + HSE + Vendor - sync dengan Excel Gabungan</span></div>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="bg-blue-50 border-2 border-purple-300 rounded-lg p-3 text-center"><p className="text-[11px] font-black">1. Elemen CSMS</p><p className="font-black text-2xl text-blue-700">{rekapGabungan.groups['1. Elemen CSMS']}</p><p className="text-[9px] mt-1">ADM {rekapGabungan.detail['CSMS-ADM']} | COMP {rekapGabungan.detail['CSMS-COMP']} | MOC {rekapGabungan.detail['CSMS-MOC']}</p></div>
+            <div className="bg-orange-50 border-2 border-purple-300 rounded-lg p-3 text-center"><p className="text-[11px] font-black">2. Fisik Lapangan</p><p className="font-black text-2xl text-orange-600">{rekapGabungan.groups['2. Fisik Lapangan']}</p><p className="text-[9px] mt-1">APD {rekapGabungan.detail['FISIK-APD']} | TOOLS {rekapGabungan.detail['FISIK-TOOLS']} | HOUSE {rekapGabungan.detail['FISIK-HOUSE']} | BARIKADE {rekapGabungan.detail['FISIK-BARIKADE']} | EMER {rekapGabungan.detail['FISIK-EMER']}</p></div>
+            <div className="bg-yellow-50 border-2 border-purple-300 rounded-lg p-3 text-center"><p className="text-[11px] font-black">3. Perilaku Pekerja</p><p className="font-black text-2xl text-yellow-600">{rekapGabungan.groups['3. Perilaku Pekerja']}</p><p className="text-[9px] mt-1">SOP {rekapGabungan.detail['PERILAKU-SOP']} | POSISI {rekapGabungan.detail['PERILAKU-POSISI']} | DISIPLIN {rekapGabungan.detail['PERILAKU-DISIPLIN']}</p></div>
+            <div className="bg-red-50 border-2 border-purple-300 rounded-lg p-3 text-center"><p className="text-[11px] font-black">4. Tingkat Risiko</p><p className="font-black text-2xl text-red-600">{rekapGabungan.groups['4. Tingkat Risiko']}</p><p className="text-[9px] mt-1">CRITICAL {rekapGabungan.detail['RISK-CRITICAL']} | MAJOR {rekapGabungan.detail['RISK-MAJOR']} | MINOR {rekapGabungan.detail['RISK-MINOR']}</p></div>
+          </div>
+        </div>
+
+        <div className="text-[10px] text-slate-500">V51 - 8 kotak sync Excel - Internal 4 kotak biru border-biru, Gabungan 4 kotak border-ungu - rekap otomatis temuan_list untuk Berita Acara Formal Mingguan</div>
       </div>
 
       <div className="bg-white border rounded-xl p-4">
