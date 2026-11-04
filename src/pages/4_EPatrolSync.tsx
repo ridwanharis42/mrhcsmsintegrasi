@@ -485,21 +485,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center"><p className="text-[10px]">🔴 OVERLAP</p><p className="font-black text-red-600">{overlapCount}</p></div>
         <div className="bg-slate-900 text-white rounded-lg p-3 text-center"><p className="text-[10px]">Avg CSMS</p><p className="font-black">{patrols.length>0 ? Math.round((safeCount*100 + warningCount*70 + overlapCount*30)/patrols.length) : 0}</p></div>
       </div>
-
-      {/* V41 INFO QR UNIVERSAL */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg p-3 text-[11px]">
-        <p className="font-black">V41 FIX QR PATROL GABUNGAN UNIVERSAL - 2 QR Besar 200x200 - QR1 Data WP Text + QR2 Link https://mrhcsmsintegrasi.vercel.app/?patrol=1&wp=...&mode=gabungan&autoOpen=1 - Scan langsung auto-filter mrh-csmswp-2026-003 + auto-open Form Gabungan Input Manual Nama Peserta Jabatan Bagian</p>
-        <p className="mt-1">Filter aktif: {qrWP || qrWp || (typeof window !== 'undefined' ? localStorage.getItem('patrol_wp_filter')||'-' : '-')} | Mode: {typeof window !== 'undefined' ? localStorage.getItem('patrol_mode')||'gabungan' : 'gabungan'} | Pending: {typeof window !== 'undefined' ? (localStorage.getItem('pendingPatrol') ? 'YES - akan auto open' : 'NO') : '-'}</p>
-        {qrWP && <p className="mt-1 bg-white/20 p-1 rounded">QR Link: {generateQRUrl(qrWP, 'Peserta', '')}</p>}
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[11px]">
-        <p className="font-bold">🚓 E-PATROL V41 FIX - QR Gabungan Universal Manual Peserta - Auto Filter WP + Auto Open Form - 2QR Universal</p>
-        <p className="mt-1">FIX: QR Patrol Gabungan belum muncul form - Sekarang App.tsx simpan pendingPatrol ke localStorage + setActiveMenu('patrol') + EPatrolSync baca pendingPatrol + auto startPatrol dummy fallback mrh-csmswp-2026-003 - Form Gabungan Input Manual Nama Peserta Jabatan Bagian muncul otomatis.</p>
-        <p className="mt-1">Sync {lastSync} | WP {activePermits.length} | Total {patrols.length} Int {internalCount} Gab {gabunganCount} | Safe {safeCount} Warning {warningCount} Overlap {overlapCount}</p>
-      </div>
-
-      <div className="bg-white border rounded-xl p-4">
+<div className="bg-white border rounded-xl p-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-2 text-[11px]">
           <div className="font-black">📱 QR Patrol Per Peserta - Auto-open Form 4 Elemen - V41 Universal Link</div>
           <div className="mt-1">QR URL Universal: {typeof window !== 'undefined' ? `${window.location.origin}/?patrol=1&wp=${activePermits[0]?.nomor_wp||'mrh-csmswp-2026-003'}&mode=gabungan&autoOpen=1` : 'https://mrhcsmsintegrasi.vercel.app/?patrol=1&wp=mrh-csmswp-2026-003&mode=gabungan&autoOpen=1'} - Scan pakai HP - Auto open Form E-Patrol Gabungan - TEST STRIC AREA E - Filter per peserta - Role-based preset - Submit ke WP untuk perbaikan kontraktor</div>
