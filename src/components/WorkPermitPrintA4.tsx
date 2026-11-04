@@ -37,13 +37,13 @@ const getQRFormPatrol = (permit:any, baseUrl: string) => {
   const area = permit.area_name || 'AREA'
   const vendor = permit.vendor_name || 'PT MEGA PERKASA JAYA'
   const judul = permit.judul || 'TEST STRIC AREA E'
-  return `${baseUrl}/?patrol=1&wp=${encodeURIComponent(wp)}&area=${encodeURIComponent(area)}&vendor=${encodeURIComponent(vendor)}&judul=${encodeURIComponent(judul)}&mode=gabungan&autoOpen=1`
+  return `${baseUrl}/?patrol=1&wp=${encodeURIComponent(wp)}&area=${encodeURIComponent(area)}&vendor=${encodeURIComponent(vendor)}&judul=${encodeURIComponent(judul)}&mode=choose&autoOpen=1`
 }
 
 export function WorkPermitPrintA4({ permit, appSettings, onClose }: Props) {
   // V42 FIX HARDCODE VERCEL PROD - Ln 44 PATCH - Agar scan HP tidak timeout - IPv4 hanya untuk local dev
   // Sebelumnya Ln 47-62 auto-detect origin, sekarang hardcode Vercel prod langsung
-  const [baseUrl, setBaseUrl] = useState('https://mrhcsmsintegrasi.vercel.app')
+  const [baseUrl, setBaseUrl] = useState('https://mrhcsmsintegrasi.vercel.app') // V43 FIX mode=choose - QR Universal 1 untuk pilih Internal/Gabungan
 
   const qrDataWP = useMemo(()=> getQRDataWP(permit), [permit])
   const qrFormPatrol = useMemo(()=> getQRFormPatrol(permit, baseUrl), [permit, baseUrl])
@@ -126,13 +126,13 @@ export function WorkPermitPrintA4({ permit, appSettings, onClose }: Props) {
         </div>
 
         <div className="border-2 border-blue-600 rounded p-3 bg-blue-50 text-center">
-          <div className="font-black text-[13px] bg-blue-600 text-white py-1 px-2 rounded">QR 2 FORM E-PATROL GABUNGAN Universal V42 - 200x200 - HARDCODE VERCEL - NO TIMEOUT</div>
+          <div className="font-black text-[13px] bg-blue-600 text-white py-1 px-2 rounded">QR 2 FORM E-PATROL UNIVERSAL V43 - 200x200 - mode=choose - Pilih Internal/Gabungan</div>
           <div className="mt-3 flex justify-center">
             <QRImg value={qrFormPatrol} size={200} />
           </div>
           <div className="text-[10px] font-bold mt-2">Form Patrol: {permit.nomor_wp} - Auto Open Gabungan</div>
           <div className="text-[8px] mt-1 text-left bg-white border p-1 rounded font-mono break-all">{qrFormPatrol}</div>
-          <div className="text-[9px] mt-2 font-black text-left">QR2 Vercel Prod: https://mrhcsmsintegrasi.vercel.app/?patrol=1&wp=...&mode=gabungan&autoOpen=1</div>
+          <div className="text-[9px] mt-2 font-black text-left">QR2 Vercel Prod: https://mrhcsmsintegrasi.vercel.app/?patrol=1&wp=...&mode=choose&autoOpen=1</div>
           <div className="text-[9px] mt-1 text-left">Scan HP → Login → Auto ke menu 4. E-Patrol (Sync) → Form Gabungan Input Manual Nama Peserta Jabatan Bagian auto-muncul V42</div>
         </div>
       </div>

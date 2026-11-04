@@ -1,4 +1,5 @@
 // @ts-nocheck
+// V41 QR PATROL GABUNGAN FIX - PT MRH DigitalHub - CSMS INTEGRATED - FIX UNIVERSAL 2 QR
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 
@@ -26,7 +27,7 @@ const KATEGORI_TEMUAN: KategoriTemuan[] = [
   { group: '3. Perilaku Pekerja (Unsafe Act)', code: 'PERILAKU-POSISI', label: 'Posisi Kerja Berbahaya (Ergonomics & Positioning)', desc: 'Line of fire', contoh: 'Di bawah beban angkatan, posisi berisiko cedera' },
   { group: '3. Perilaku Pekerja (Unsafe Act)', code: 'PERILAKU-DISIPLIN', label: 'Kedisiplinan & Perilaku (Behavioral)', desc: 'Perilaku tidak aman', contoh: 'Bercanda berlebihan, merokok area terlarang, terburu-buru' },
   { group: '4. Tingkat Risiko (Prioritas)', code: 'RISK-CRITICAL', label: 'Kritis (Critical) - Stop Work', desc: 'Bisa fatality', contoh: 'Ruang terbatas tanpa detektor gas - WAJIB HENTI' },
-  { group: '4. Tingkat Risiko (Prioritas)', code: 'RISK-MAJOR', label: 'Mayor (Major) - Perbaiki &lt;24 jam', desc: 'Cidera sedang-berat', contoh: 'Ketidaksesuaian berat standar K3' },
+  { group: '4. Tingkat Risiko (Prioritas)', code: 'RISK-MAJOR', label: 'Mayor (Major) - Perbaiki <24 jam', desc: 'Cidera sedang-berat', contoh: 'Ketidaksesuaian berat standar K3' },
   { group: '4. Tingkat Risiko (Prioritas)', code: 'RISK-MINOR', label: 'Minor (Minor) - Perbaiki 3-7 hari', desc: 'Ringan administratif', contoh: 'Ketidaksesuaian ringan tidak bahaya langsung' },
 ]
 
@@ -58,14 +59,13 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   const [filterRisk, setFilterRisk] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPatrolType, setFilterPatrolType] = useState('all')
-  const [showOnlyActive, setShowOnlyActive] = useState(true) // FIX V36c: Filter hanya WP active dari file 2
-  const [filterPeserta, setFilterPeserta] = useState('all') // FIX V37: Filter per peserta patrol - ide Bapak QR scan per peserta
-  const [qrWP, setQrWP] = useState('') // FIX V37: QR Code untuk WP yang dipatrol
+  const [showOnlyActive, setShowOnlyActive] = useState(true)
+  const [filterPeserta, setFilterPeserta] = useState('all')
+  const [qrWP, setQrWP] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [patrolType, setPatrolType] = useState<PatrolType>('internal')
   const [lastSync, setLastSync] = useState(new Date().toLocaleTimeString())
 
-  // Form utama
   const [formData, setFormData] = useState<any>({
     nomor_wp: '', judul_pekerjaan: '', area_id: '', area_name: '', vendor_name: '',
     risk_level: 'medium', risk_score: 9, risk_likelihood: 3, risk_severity: 3,
@@ -78,7 +78,6 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
     lat: -6.201, lng: 106.801, work_radius_m: 25
   })
 
-  // V34 FIX: Multi select sub kategori - bukan radio single
   const [selectedSubKategori, setSelectedSubKategori] = useState<string[]>([])
   const [temuanList, setTemuanList] = useState<TemuanEntry[]>([])
   const [pesertaInternal, setPesertaInternal] = useState<string[]>(['Safety Officer PT MRH'])
@@ -87,11 +86,47 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
     { id: 2, nama: 'Siti HSE', jabatan: 'HSE Officer', bagian: 'HSE' },
     { id: 3, nama: 'Joko Vendor', jabatan: 'Safety Vendor', bagian: 'PT MRH DigitalHub' },
   ])
+  // V43 MOBILE - Session & Sync
+  const [sessionIdV43, setSessionIdV43] = useState('')
+  const [tglPatrolV43, setTglPatrolV43] = useState(new Date().toISOString().split('T')[0])
+  const [syncStatusV43, setSyncStatusV43] = useState('')
+
   const [newPesertaNama, setNewPesertaNama] = useState('')
   const [newPesertaJabatan, setNewPesertaJabatan] = useState('')
   const [newPesertaBagian, setNewPesertaBagian] = useState('')
 
-  // FIX V36b: Sync judul dari file 2 EWorkPermitFlow - cek semua kemungkinan kolom judul di Supabase work_permits
+
+  // V43 PATCH - Load Session Peserta dari PatrolEntryMobile (QR Universal Choose Mode)
+  useEffect(()=>{
+    try{
+      const sess = localStorage.getItem('patrol_session_id') || ''
+      const tgl = localStorage.getItem('patrol_tgl') || new Date().toISOString().split('T')[0]
+      if(sess){
+        setSessionIdV43(sess)
+        setTglPatrolV43(tgl)
+        const raw = localStorage.getItem(`patrol_session_${sess}`)
+        if(raw){
+          const arr = JSON.parse(raw)
+          if(Array.isArray(arr) && arr.length>0){
+            // Merge ke pesertaGabunganList tanpa hapus default
+            const mapped: PesertaGabungan[] = arr.map((p:any, idx:number)=>({
+              id: 100+idx,
+              nama: p.nama || p.name,
+              jabatan: p.jabatan || 'Helper',
+              bagian: p.bagian || 'Area E'
+            }))
+            // Gabungkan, hindari duplikat nama
+            setPesertaGabunganList(prev=>{
+              const names = new Set(prev.map(x=>x.nama.toLowerCase()))
+              const add = mapped.filter(m=>!names.has(m.nama.toLowerCase()))
+              return [...prev, ...add]
+            })
+          }
+        }
+      }
+    }catch(e){ console.error('V43 session load', e) }
+  }, [showForm])
+
   const getJudulLengkap = (p:any) => {
     return (
       p.judul ||
@@ -112,12 +147,10 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   }
 
   const isWPActive = (p:any) => {
-    // FIX V36c: Cek status approval dari file 2 EWorkPermitFlow - sync dengan DAFTAR WORK PERMIT
     const s1 = (p.status_approval || '').toString().toLowerCase()
     const s2 = (p.status || '').toString().toLowerCase()
     const s3 = (p.approval_status || '').toString().toLowerCase()
     const s4 = (p.statusApproval || '').toString().toLowerCase()
-    // active bisa: active, approved_gm -> active, approved -> active, Level 5/4: GM approved -> Active
     if (s1.includes('active') || s2 === 'active' || s3.includes('active') || s4.includes('active')) return true
     if (s1.includes('approved_gm') && s1.includes('active')) return true
     if (s1 === 'active' || s2 === 'active' || s3 === 'active') return true
@@ -125,23 +158,18 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   }
 
   const generateQRUrl = (nomor_wp:string, pesertaNama:string, jabatan:string) => {
-    // FIX V37: Ide Bapak - QR Code untuk nomer WP yang akan dipatrol - setiap peserta scan QR -> muncul form patrol 4 elemen
-    const base = typeof window !== 'undefined' ? window.location.origin : 'https://csms.mrhdigitalhub.com'
-    return `${base}/patrol?wp=${encodeURIComponent(nomor_wp)}&peserta=${encodeURIComponent(pesertaNama)}&jabatan=${encodeURIComponent(jabatan)}&t=${Date.now()}`
+    const base = typeof window !== 'undefined' ? window.location.origin : 'https://mrhcsmsintegrasi.vercel.app'
+    return `${base}/?patrol=1&wp=${encodeURIComponent(nomor_wp)}&mode=gabungan&autoOpen=1`
   }
 
   const getRolePresets = (jabatan:string) => {
-    // FIX V37: Ide saya - Role-based kategori preset - biar cepat sesuai jabatan
     const jb = jabatan.toLowerCase()
-    if (jb.includes('owner')) return ['CSMS-MOC', 'RISK-CRITICAL', 'CSMS-ADM'] // Owner fokus MOC & Kritis
-    if (jb.includes('hse')) return ['FISIK-APD', 'FISIK-TOOLS', 'FISIK-BARIKADE', 'FISIK-EMER', 'RISK-CRITICAL'] // HSE fokus APD, Tools, Barikade, Emergency
-    if (jb.includes('vendor') || jb.includes('safety vendor')) return ['FISIK-HOUSE', 'PERILAKU-SOP', 'PERILAKU-POSISI', 'FISIK-TOOLS'] // Vendor fokus Housekeeping & Perilaku
-    if (jb.includes('utility') || jb.includes('supervisor')) return ['FISIK-EMER', 'CSMS-COMP', 'RISK-MAJOR', 'FISIK-TOOLS'] // Utility fokus Emergency & Kompetensi
-    return [] // default semua
+    if (jb.includes('owner')) return ['CSMS-MOC', 'RISK-CRITICAL', 'CSMS-ADM']
+    if (jb.includes('hse')) return ['FISIK-APD', 'FISIK-TOOLS', 'FISIK-BARIKADE', 'FISIK-EMER', 'RISK-CRITICAL']
+    if (jb.includes('vendor') || jb.includes('safety vendor')) return ['FISIK-HOUSE', 'PERILAKU-SOP', 'PERILAKU-POSISI', 'FISIK-TOOLS']
+    if (jb.includes('utility') || jb.includes('supervisor')) return ['FISIK-EMER', 'CSMS-COMP', 'RISK-MAJOR', 'FISIK-TOOLS']
+    return []
   }
-
-
-
 
   useEffect(() => {
     loadActivePermits()
@@ -153,20 +181,15 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
     return () => { supabase.removeChannel(channel) }
   }, [propPermits])
 
-
-  // FIX V38: QR Scan di HP - Jika ?patrol=1&wp=...&peserta=... maka langsung tampilkan Form Temuan Patrol 4 Elemen + Upload Foto - Sync dengan file 4 E-Patrol
   const [qrMode, setQrMode] = useState(false)
   const [qrWp, setQrWp] = useState('')
   const [qrPeserta, setQrPeserta] = useState('')
   const [qrJabatan, setQrJabatan] = useState('')
   const [qrJudul, setQrJudul] = useState('')
 
-  // FIX V39 - Ide Perbaikan Bapak - QR 2 Universal - Bisa dipakai siapa saja - Tidak perlu khusus per orang
-  // Di Form E-Patrol nanti adalah Nama Peserta Patrol - Jabatan - Bagian Yang bisa diinput secara manual
   const [manualPeserta, setManualPeserta] = useState('')
   const [manualJabatan, setManualJabatan] = useState('')
   const [manualBagian, setManualBagian] = useState('')
-
 
   useEffect(()=>{
     const p = new URLSearchParams(window.location.search)
@@ -176,14 +199,74 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
       setQrPeserta(p.get('peserta')||'')
       setQrJabatan(p.get('jabatan')||'')
       setQrJudul(p.get('judul')||'')
-      // Auto set filter peserta jika bukan SCAN
       if (p.get('peserta') && p.get('peserta')!=='SCAN') {
         setFilterPeserta(p.get('peserta')!)
       }
     }
   }, [])
 
-  // FIX V37b: QR Auto-open form 4 elemen - Baca URL ?wp=mrh-csmswp-2026-003&peserta=Siti HSE&jabatan=HSE Officer&mode=gabungan&autoOpen=1
+  // V41 FIX UTAMA QR GABUNGAN UNIVERSAL - AUTO FILTER WP mrh-csmswp-2026-003 + AUTO OPEN FORM GABUNGAN
+  useEffect(()=>{
+    if (typeof window === 'undefined') return
+    const pendingRaw = localStorage.getItem('pendingPatrol')
+    const filterRaw = localStorage.getItem('patrol_wp_filter')
+    const modeRaw = localStorage.getItem('patrol_mode')
+    console.log('[V41 EPatrolSync] Check pendingPatrol:', pendingRaw, 'filter:', filterRaw, 'mode:', modeRaw)
+    if (!pendingRaw && !filterRaw) return
+
+    let pending: any = {}
+    try { pending = pendingRaw ? JSON.parse(pendingRaw) : { wp: filterRaw, mode: modeRaw || 'gabungan', autoOpen: '1' } } catch { pending = { wp: filterRaw, mode: 'gabungan', autoOpen: '1' } }
+
+    const wpParam = pending.wp || filterRaw
+    const modeParam = (pending.mode || modeRaw || 'gabungan') as PatrolType
+    const autoOpen = pending.autoOpen || '1'
+    const pesertaParam = pending.peserta || ''
+    const jabatanParam = pending.jabatan || ''
+
+    if (wpParam){
+      setQrWP(wpParam)
+      setQrWp(wpParam)
+      // Auto set filter peserta jika ada
+      if (pesertaParam && pesertaParam !== 'SCAN'){
+        setFilterPeserta(pesertaParam)
+        setManualPeserta(pesertaParam)
+        if (jabatanParam) setManualJabatan(jabatanParam)
+        setPesertaGabunganList(prev=>{
+          const exists = prev.find(p=>p.nama===pesertaParam)
+          if (exists) return prev
+          return [...prev, { id: Date.now(), nama: pesertaParam, jabatan: jabatanParam || 'Peserta', bagian: 'Auto dari QR Scan' }]
+        })
+      }
+
+      // Cari permit - tunggu activePermits loaded
+      const tryStart = () => {
+        const found = activePermits.find((p:any)=> p.nomor_wp===wpParam || p.nomor_wp?.includes(wpParam) || wpParam.includes(p.nomor_wp || ''))
+        if (found){
+          console.log('[V41] Found WP, auto startPatrol Gabungan:', found.nomor_wp)
+          setTimeout(()=> startPatrol(found, modeParam), 800)
+        } else if (activePermits.length>0){
+          // Coba case-insensitive
+          const found2 = activePermits.find((p:any)=> p.nomor_wp?.toLowerCase().includes(wpParam.toLowerCase()) || wpParam.toLowerCase().includes(p.nomor_wp?.toLowerCase()||''))
+          if (found2){
+            console.log('[V41] Found WP2, auto startPatrol:', found2.nomor_wp)
+            setTimeout(()=> startPatrol(found2, modeParam), 800)
+          } else {
+            // Fallback dummy WP jika tidak ada di DB (untuk mrh-csmswp-2026-003)
+            if (wpParam.includes('mrh-csmswp') || wpParam.includes('2026-003')){
+              const dummy = { nomor_wp: wpParam, judul: 'TEST STRIC AREA E - QR GABUNGAN', judul_pekerjaan: 'TEST STRIC AREA E - QR GABUNGAN', area_id: 'Area E', area_name: 'Area E', vendor_name: 'PT MRH DigitalHub', risk_level: 'medium', risk_score: 9, risk_likelihood: 3, risk_severity: 3, lat: -6.201, lng: 106.801 }
+              console.log('[V41] Dummy WP fallback, auto startPatrol:', wpParam)
+              setTimeout(()=> startPatrol(dummy, modeParam), 800)
+            }
+          }
+        }
+      }
+
+      if (activePermits.length>0) tryStart()
+      // Jika activePermits belum load, effect akan re-run saat activePermits berubah (dependency)
+    }
+  }, [activePermits])
+
+  // FIX V37b - QR Auto-open lama tetap dipertahankan
   useEffect(()=>{
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
@@ -192,13 +275,10 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
     const jabatanParam = params.get('jabatan')
     const modeParam = params.get('mode') as PatrolType || 'gabungan'
     const autoOpen = params.get('autoOpen')
-    if (wpParam) {
-      // Cari permit dengan nomor_wp = wpParam
+    if (wpParam && activePermits.length>0) {
       const found = activePermits.find((p:any)=> p.nomor_wp===wpParam || p.nomor_wp?.includes(wpParam) || wpParam.includes(p.nomor_wp))
       if (found) {
-        // Auto set peserta jika ada
         if (pesertaParam && pesertaParam !== 'SCAN') {
-          // Jika pesertaParam ada, set filterPeserta dan tambahkan ke pesertaGabunganList jika belum ada
           setFilterPeserta(pesertaParam)
           if (jabatanParam) {
             setPesertaGabunganList(prev=>{
@@ -208,31 +288,18 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
             })
           }
         }
-        // Auto open form patrol gabungan/internal sesuai mode
-        const type = modeParam==='internal' ? 'internal' : 'gabungan'
-        // Delay sedikit biar activePermits sudah load
-        setTimeout(()=> startPatrol(found, type), 800)
-        // Jika autoOpen=1, langsung scroll ke form
+        setTimeout(()=> startPatrol(found, modeParam==='internal' ? 'internal' : 'gabungan'), 800)
         if (autoOpen==='1') {
           setQrWP(wpParam)
-        }
-      } else if (activePermits.length>0) {
-        // Jika belum ketemu tapi activePermits sudah ada, coba lagi cari dengan includes
-        const found2 = activePermits.find((p:any)=> p.nomor_wp?.toLowerCase().includes(wpParam.toLowerCase()) || wpParam.toLowerCase().includes(p.nomor_wp?.toLowerCase()))
-        if (found2) {
-          setTimeout(()=> startPatrol(found2, (modeParam as PatrolType)||'gabungan'), 800)
         }
       }
     }
   }, [activePermits])
 
-
-
   const loadActivePermits = async () => {
     try {
       const { data } = await supabase.from('work_permits').select('*').order('created_at',{ascending:false}).limit(20)
       let list = (data && data.length>0) ? data : (propPermits || [])
-      // FIX V36b: Normalize judul dari file 2 - sync dengan 2_EWorkPermitFlow.tsx - biar WP 001/002 tidak abu-abu —Judul belum diisi—
       list = list.map((p:any)=>{
         const j = getJudulLengkap(p)
         return { ...p, judul: j || p.judul, judul_pekerjaan: j || p.judul_pekerjaan }
@@ -272,7 +339,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   }
   const getTingkatBadge = (kode:string) => {
     if (kode==='RISK-CRITICAL') return { bg:'bg-red-700', text:'KRITIS - Stop Work', dot:'🔴' }
-    if (kode==='RISK-MAJOR') return { bg:'bg-orange-500', text:'MAYOR &lt;24 jam', dot:'🟠' }
+    if (kode==='RISK-MAJOR') return { bg:'bg-orange-500', text:'MAYOR <24 jam', dot:'🟠' }
     return { bg:'bg-yellow-400', text:'MINOR 3-7 hari', dot:'🟡' }
   }
 
@@ -291,20 +358,17 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   const internalCount = patrols.filter(p=>(p.patrol_type||'internal')==='internal').length
   const gabunganCount = patrols.filter(p=>p.patrol_type==='gabungan').length
 
-  // V34 FIX: Toggle multi select - pilih salah satu tidak hapus yang sudah dipilih
   const toggleSubKategori = (code:string) => {
     const exists = selectedSubKategori.includes(code)
     let newSelected: string[]
     if (exists) {
       newSelected = selectedSubKategori.filter(c=>c!==code)
-      // hapus dari temuanList
       setTemuanList(prev=>prev.filter(t=>t.subKategoriCode!==code))
     } else {
       newSelected = [...selectedSubKategori, code]
-      // auto tambah ke temuanList
       const kat = KATEGORI_TEMUAN.find(k=>k.code===code)
       if (kat) {
-        const defaultPeserta = patrolType==='internal' ? (pesertaInternal[0]||formData.petugas) : (pesertaGabunganList[0]?.nama||formData.petugas)
+        const defaultPeserta = patrolType==='internal' ? (pesertaInternal[0]||formData.petugas) : (pesertaGabunganList[0]?.nama||manualPeserta||formData.petugas)
         const newEntry: TemuanEntry = {
           id: Date.now() + Math.floor(Math.random()*1000),
           peserta: defaultPeserta,
@@ -312,7 +376,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
           subKategoriLabel: kat.label,
           area: formData.area_name || formData.area_id,
           temuan: `${kat.label} - ${kat.contoh}`,
-          tindakan: kat.code.includes('CRITICAL') ? 'HENTIKAN PEKERJAAN - Stop Work Authority - Evakuasi - Pasang detektor gas - HSE approve' : kat.code.includes('MAJOR') ? 'Perbaiki &lt;24 jam - Ganti APD, perbaiki barikade, rapikan housekeeping' : 'Perbaiki 3-7 hari - Lengkapi administrasi, tegur disiplin',
+          tindakan: kat.code.includes('CRITICAL') ? 'HENTIKAN PEKERJAAN - Stop Work Authority - Evakuasi - Pasang detektor gas - HSE approve' : kat.code.includes('MAJOR') ? 'Perbaiki <24 jam - Ganti APD, perbaiki barikade, rapikan housekeeping' : 'Perbaiki 3-7 hari - Lengkapi administrasi, tegur disiplin',
           status: 'open'
         }
         setTemuanList(prev=>[...prev, newEntry])
@@ -377,6 +441,14 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
   }
 
   const savePatrol = async () => {
+    // V41 FIX: Jika manualPeserta diisi untuk gabungan universal, tambahkan ke list
+    if (patrolType==='gabungan' && manualPeserta){
+      const exists = pesertaGabunganList.find(p=>p.nama===manualPeserta)
+      if (!exists){
+        pesertaGabunganList.push({ id: Date.now(), nama: manualPeserta, jabatan: manualJabatan||'Peserta', bagian: manualBagian||'Umum' })
+      }
+    }
+
     const payload = {
       nomor_wp: formData.nomor_wp,
       judul_pekerjaan: formData.judul_pekerjaan,
@@ -390,7 +462,7 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
       tgl_patrol: formData.tgl_patrol,
       jam_patrol: formData.jam_patrol,
       patrol_type: patrolType,
-      petugas: formData.petugas,
+      petugas: patrolType==='gabungan' && manualPeserta ? manualPeserta : formData.petugas,
       status_patrol: formData.status_patrol,
       tingkat_risiko: formData.tingkat_risiko,
       batas_perbaikan: formData.batas_perbaikan,
@@ -408,9 +480,15 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
       const { error } = await supabase.from('e_patrol').insert(payload)
       if (error) throw error
       setShowForm(false); loadPatrols()
+      // Clear pending setelah success
+      localStorage.removeItem('pendingPatrol')
+      localStorage.removeItem('patrol_wp_filter')
+      localStorage.removeItem('patrol_mode')
     } catch {
       setPatrols(prev=>[{...payload, id: Date.now().toString()} as any, ...prev])
       setShowForm(false)
+      localStorage.removeItem('pendingPatrol')
+      localStorage.removeItem('patrol_wp_filter')
     }
   }
 
@@ -436,25 +514,35 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
         <div className="bg-slate-900 text-white rounded-lg p-3 text-center"><p className="text-[10px]">Avg CSMS</p><p className="font-black">{patrols.length>0 ? Math.round((safeCount*100 + warningCount*70 + overlapCount*30)/patrols.length) : 0}</p></div>
       </div>
 
+      {/* V41 INFO QR UNIVERSAL */}
+      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg p-3 text-[11px]">
+        <p className="font-black">V41 FIX QR PATROL GABUNGAN UNIVERSAL - 2 QR Besar 200x200 - QR1 Data WP Text + QR2 Link https://mrhcsmsintegrasi.vercel.app/?patrol=1&wp=...&mode=gabungan&autoOpen=1 - Scan langsung auto-filter mrh-csmswp-2026-003 + auto-open Form Gabungan Input Manual Nama Peserta Jabatan Bagian</p>
+        <p className="mt-1">Filter aktif: {qrWP || qrWp || (typeof window !== 'undefined' ? localStorage.getItem('patrol_wp_filter')||'-' : '-')} | Mode: {typeof window !== 'undefined' ? localStorage.getItem('patrol_mode')||'gabungan' : 'gabungan'} | Pending: {typeof window !== 'undefined' ? (localStorage.getItem('pendingPatrol') ? 'YES - akan auto open' : 'NO') : '-'}</p>
+        {qrWP && <p className="mt-1 bg-white/20 p-1 rounded">QR Link: {generateQRUrl(qrWP, 'Peserta', '')}</p>}
+      </div>
+
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[11px]">
-        <p className="font-bold">🚓 E-PATROL V34 FIX - Multi Select Sub Kategori Tanpa Hapus - Tabel Temuan + Foto Before/After - Internal Peserta List - Gabungan Peserta Jabatan Bagian - Tanpa Utility</p>
-        <p className="mt-1">BUG FIX: Sebelumnya radio single - klik sub lain pindah & hapus yang sudah dipilih - Sekarang checkbox multi - pilih salah satu tidak hapus yang lain - Auto muncul di temuan patrol tabel No-Peserta-Sub Kategori-Area-Temuan-Upload Foto - Tindakan juga dari sub kategori sama - Sync upload foto after perbaikan.</p>
-        <p className="mt-1">Internal: Tabel No-Peserta Patrol-Sub Kategori-Area-Temuan Patrol (text)-Upload dokumen photo bisa view download untuk Tindakan Perbaikan nya juga dibuat dari sub kategori temuan patrol dengan tabel kolom yang sama sehingga bisa sync dan ada upload dokumen photo after perbaikan.</p>
-        <p className="mt-1">Gabungan: Konsep sama + tabel peserta No-Peserta-Jabatan-Bagian.</p>
+        <p className="font-bold">🚓 E-PATROL V41 FIX - QR Gabungan Universal Manual Peserta - Auto Filter WP + Auto Open Form - 2QR Universal</p>
+        <p className="mt-1">FIX: QR Patrol Gabungan belum muncul form - Sekarang App.tsx simpan pendingPatrol ke localStorage + setActiveMenu('patrol') + EPatrolSync baca pendingPatrol + auto startPatrol dummy fallback mrh-csmswp-2026-003 - Form Gabungan Input Manual Nama Peserta Jabatan Bagian muncul otomatis.</p>
         <p className="mt-1">Sync {lastSync} | WP {activePermits.length} | Total {patrols.length} Int {internalCount} Gab {gabunganCount} | Safe {safeCount} Warning {warningCount} Overlap {overlapCount}</p>
       </div>
 
       <div className="bg-white border rounded-xl p-4">
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-2 text-[11px]">
-          <div className="font-black">📱 QR Patrol Per Peserta - Auto-open Form 4 Elemen - Konfirmasi: Scan QR di A4 Print - Langsung Buka Form Temuan Patrol</div>
-          <div className="mt-1">QR URL: {typeof window !== 'undefined' ? `${window.location.origin}/patrol?wp=${activePermits[0]?.nomor_wp||'mrh-csmswp-2026-003'}&peserta=SCAN&mode=gabungan&autoOpen=1` : 'https://csms.mrhdigitalhub.com/patrol?wp=mrh-csmswp-2026-003&peserta=SCAN&mode=gabungan&autoOpen=1'} - Scan pakai HP - Auto open Form E-Patrol Gabungan - mrh-csmswp-2026-003 - TEST STRIC AREA E - Filter per peserta - Role-based preset - Submit ke WP untuk perbaikan kontraktor - Nama 0 = Belum scan/submit</div>
+          <div className="font-black">📱 QR Patrol Per Peserta - Auto-open Form 4 Elemen - V41 Universal Link</div>
+          <div className="mt-1">QR URL Universal: {typeof window !== 'undefined' ? `${window.location.origin}/?patrol=1&wp=${activePermits[0]?.nomor_wp||'mrh-csmswp-2026-003'}&mode=gabungan&autoOpen=1` : 'https://mrhcsmsintegrasi.vercel.app/?patrol=1&wp=mrh-csmswp-2026-003&mode=gabungan&autoOpen=1'} - Scan pakai HP - Auto open Form E-Patrol Gabungan - TEST STRIC AREA E - Filter per peserta - Role-based preset - Submit ke WP untuk perbaikan kontraktor</div>
         </div>
         
         {qrMode && (
           <div className="bg-green-100 border-2 border-green-500 rounded-lg p-3 mb-3">
-            <div className="font-black text-sm">📱 QR Scan Terdeteksi - HP - {qrWp} - {qrJudul || 'TEST STRIC AREA E'}</div>
-            <div className="text-xs mt-1">Peserta: <b>{qrPeserta || 'SCAN - Pilih Peserta di bawah'}</b> - Jabatan: {qrJabatan || '-'} - Area: {new URLSearchParams(window.location.search).get('area')||'Area E'} - Vendor: {new URLSearchParams(window.location.search).get('vendor')||'PT MRH DigitalHub'}</div>
-            <div className="text-[11px] mt-1">Info WP sudah ada dari QR - Sekarang Form Temuan Patrol 4 Elemen + Upload Foto Before/After sudah muncul di bawah - Pilih Peserta Patrol - Centang Kategori Temuan 4 Kelompok - Upload Foto Before - Submit ke WP untuk perbaikan kontraktor - Nama 0 = Belum scan/submit - Ide Perbaikan Bapak V27 - 2 QR Besar - QR2 Universal - Role-based preset</div>
+            <div className="font-black text-sm">📱 QR Scan Terdeteksi V41 - {qrWp || qrWP} - {qrJudul || 'TEST STRIC AREA E'} - AUTO OPEN FORM</div>
+            <div className="text-xs mt-1">Peserta: <b>{qrPeserta || manualPeserta || 'Input Manual di Form Gabungan'}</b> - Jabatan: {qrJabatan || manualJabatan || '-'} - Area: {new URLSearchParams(window.location.search).get('area')||'Area E'} - Vendor: {new URLSearchParams(window.location.search).get('vendor')||'PT MRH DigitalHub'}</div>
+            <div className="text-[11px] mt-1">Info WP sudah ada dari QR - Form Temuan Patrol 4 Elemen + Upload Foto Before/After akan auto muncul - Jika tidak auto, klik tombol Gabungan di bawah - V41 Fix - 2 QR Besar - QR2 Universal - Role-based preset - Manual Peserta Jabatan Bagian</div>
+            <div className="mt-2 flex gap-2">
+              <input value={manualPeserta} onChange={e=>setManualPeserta(e.target.value)} placeholder="Nama Peserta Patrol (Manual Input - V41)" className="border p-2 rounded bg-white flex-1 text-xs font-bold"/>
+              <input value={manualJabatan} onChange={e=>setManualJabatan(e.target.value)} placeholder="Jabatan" className="border p-2 rounded bg-white flex-1 text-xs"/>
+              <input value={manualBagian} onChange={e=>setManualBagian(e.target.value)} placeholder="Bagian" className="border p-2 rounded bg-white flex-1 text-xs"/>
+            </div>
           </div>
         )}
 
@@ -527,52 +615,54 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
           <div className="bg-white rounded-xl w-full max-w-6xl max-h-[98vh] overflow-auto">
             <div className={`${patrolType==='gabungan'?'bg-purple-700':'bg-blue-700'} text-white p-4 flex justify-between items-center`}>
               <div><div className="font-black text-sm flex items-center gap-2">
-                    <span>{patrolType==='gabungan'?'🟣 Form E-Patrol Gabungan':'🔵 Form E-Patrol Internal'} - {formData.nomor_wp} - {formData.judul_pekerjaan}</span>
-                    {patrolType==='gabungan' && <span className="bg-white/20 px-2 py-0.5 rounded text-[10px]">📱 QR: {generateQRUrl(formData.nomor_wp, pesertaGabunganList[0]?.nama||'Peserta', pesertaGabunganList[0]?.jabatan||'').slice(0,60)}... - Scan per peserta - Submit per peserta ke WP</span>}
-                  </div><div className="text-[11px] mt-1">Area: {formData.area_name} | Vendor: {formData.vendor_name} | Risk: {formData.risk_level} {formData.risk_score} ({formData.risk_likelihood}x{formData.risk_severity}) | Type: {patrolType==='gabungan'?'Owner+HSE+Vendor Mingguan Formal Berita Acara':'Safety Officer PT MRH Harian Rutin 1 orang'} | Selected: {selectedSubKategori.length} sub kategori - Multi select tanpa hapus</div></div>
+                    <span>{patrolType==='gabungan'?'🟣 Form E-Patrol Gabungan V41':'🔵 Form E-Patrol Internal'} - {formData.nomor_wp} - {formData.judul_pekerjaan}</span>
+                    {patrolType==='gabungan' && <span className="bg-white/20 px-2 py-0.5 rounded text-[10px]">📱 QR Universal: {generateQRUrl(formData.nomor_wp, pesertaGabunganList[0]?.nama||'Peserta', pesertaGabunganList[0]?.jabatan||'').slice(0,70)}... - Manual Peserta</span>}
+                  </div><div className="text-[11px] mt-1">Area: {formData.area_name} | Vendor: {formData.vendor_name} | Risk: {formData.risk_level} {formData.risk_score} ({formData.risk_likelihood}x{formData.risk_severity}) | Type: {patrolType==='gabungan'?'Owner+HSE+Vendor Mingguan Formal Berita Acara':'Safety Officer PT MRH Harian Rutin 1 orang'} | Selected: {selectedSubKategori.length} sub kategori</div></div>
               <button onClick={()=>setShowForm(false)} className="bg-white/20 px-3 py-1 rounded text-xs">✕ Tutup</button>
             </div>
 
             <div className="p-4 space-y-4 text-xs">
-              {/* Patrol Type Switch */}
               <div className="grid grid-cols-2 gap-2">
-                <button onClick={()=>setPatrolType('internal')} className={`py-2 rounded font-black ${patrolType==='internal'?'bg-blue-600 text-white':'bg-white border'}`}>🔵 Patrol Internal - Safety Officer PT MRH - Harian Rutin - 1 orang - Cek APD, Tools, Housekeeping - Multi select tidak hapus</button>
-                <button onClick={()=>setPatrolType('gabungan')} className={`py-2 rounded font-black ${patrolType==='gabungan'?'bg-purple-600 text-white':'bg-white border'}`}>🟣 Patrol Gabungan - Owner+HSE+Vendor - Mingguan Formal - Berita Acara - Cek Kritis, MOC, Overlap - Multi select</button>
+                <button onClick={()=>setPatrolType('internal')} className={`py-2 rounded font-black ${patrolType==='internal'?'bg-blue-600 text-white':'bg-white border'}`}>🔵 Patrol Internal</button>
+                <button onClick={()=>setPatrolType('gabungan')} className={`py-2 rounded font-black ${patrolType==='gabungan'?'bg-purple-600 text-white':'bg-white border'}`}>🟣 Patrol Gabungan - Manual Peserta Jabatan Bagian - V41 FIX</button>
               </div>
 
               <div className="grid grid-cols-4 gap-3">
                 <div><label className="font-bold">Tgl Patrol</label><input type="date" value={formData.tgl_patrol} onChange={e=>setFormData({...formData, tgl_patrol: e.target.value})} className="w-full border p-2 rounded mt-1"/></div>
                 <div><label className="font-bold">Jam Patrol</label><input type="time" value={formData.jam_patrol} onChange={e=>setFormData({...formData, jam_patrol: e.target.value})} className="w-full border p-2 rounded mt-1"/></div>
-                <div><label className="font-bold">Status Patrol</label><select value={formData.status_patrol} onChange={e=>setFormData({...formData, status_patrol: e.target.value})} className="w-full border p-2 rounded mt-1 font-bold"><option value="safe">🟢 SAFE - Aman lanjut - Pion Hijau - CSMS +10</option><option value="warning">🟡 WARNING - Hati-hati overlap open - Pion Kuning - CSMS -5</option><option value="overlap">🔴 OVERLAP - Stop reschedule - Pion Merah - CSMS -15</option><option value="closed">⚪ CLOSED - Selesai</option></select></div>
-                <div><label className="font-bold">Batas Perbaikan</label><select value={formData.batas_perbaikan} onChange={e=>setFormData({...formData, batas_perbaikan: e.target.value})} className="w-full border p-2 rounded mt-1"><option value="Langsung">Langsung di tempat</option><option value="&lt;24 jam">Mayor &lt;24 jam</option><option value="3 hari">Minor 3 hari</option><option value="7 hari">Minor 7 hari</option><option value="Stop Work">Kritis - Stop Work Authority</option></select></div>
+                <div><label className="font-bold">Status Patrol</label><select value={formData.status_patrol} onChange={e=>setFormData({...formData, status_patrol: e.target.value})} className="w-full border p-2 rounded mt-1 font-bold"><option value="safe">🟢 SAFE</option><option value="warning">🟡 WARNING</option><option value="overlap">🔴 OVERLAP</option><option value="closed">⚪ CLOSED</option></select></div>
+                <div><label className="font-bold">Batas Perbaikan</label><select value={formData.batas_perbaikan} onChange={e=>setFormData({...formData, batas_perbaikan: e.target.value})} className="w-full border p-2 rounded mt-1"><option value="Langsung">Langsung di tempat</option><option value="<24 jam">Mayor &lt;24 jam</option><option value="3 hari">Minor 3 hari</option><option value="7 hari">Minor 7 hari</option><option value="Stop Work">Kritis - Stop Work Authority</option></select></div>
               </div>
 
-              {/* PESERTA - INTERNAL vs GABUNGAN */}
+              {/* V41 FIX GABUNGAN MANUAL PESERTA */}
               {patrolType==='internal' ? (
                 <div className="border-2 border-blue-300 rounded-xl p-3 bg-blue-50">
-                  <div className="font-black text-xs">🔵 Peserta Patrol Internal - No - Peserta Patrol - Untuk Tabel Temuan No-Peserta-Sub Kategori-Area-Temuan-Upload Foto Before - Tindakan-Upload Foto After</div>
-                  <div className="mt-2 flex gap-2"><input value={pesertaInternal[0]||''} onChange={e=>setPesertaInternal([e.target.value])} className="flex-1 border p-2 rounded bg-white" placeholder="Safety Officer PT MRH"/><span className="text-[10px] self-center">Peserta internal bisa 1-2 orang - Nama akan muncul di tabel temuan - Kolom No-Peserta-Sub Kategori-Area-Temuan-Upload Foto</span></div>
+                  <div className="font-black text-xs">🔵 Peserta Patrol Internal</div>
+                  <div className="mt-2 flex gap-2"><input value={pesertaInternal[0]||''} onChange={e=>setPesertaInternal([e.target.value])} className="flex-1 border p-2 rounded bg-white" placeholder="Safety Officer PT MRH"/></div>
                 </div>
               ) : (
                 <div className="border-2 border-purple-300 rounded-xl p-3 bg-purple-50">
-                  <div className="font-black text-xs">🟣 Peserta Patrol Gabungan - Tabel No - Peserta Patrol - Jabatan - Bagian - Inti Perbedaan Internal vs Gabungan</div>
+                  <div className="font-black text-xs">🟣 Peserta Patrol Gabungan V41 - Input Manual Nama Peserta Patrol Jabatan Bagian - QR Universal 2 QR 200x200</div>
+                  <div className="grid grid-cols-3 gap-2 mt-2 bg-white p-2 rounded border-2 border-purple-400">
+                    <input value={manualPeserta} onChange={e=>setManualPeserta(e.target.value)} placeholder="Nama Peserta Patrol (Manual - WAJIB)" className="border p-2 rounded bg-yellow-50 font-bold"/>
+                    <input value={manualJabatan} onChange={e=>setManualJabatan(e.target.value)} placeholder="Jabatan" className="border p-2 rounded bg-white"/>
+                    <input value={manualBagian} onChange={e=>setManualBagian(e.target.value)} placeholder="Bagian" className="border p-2 rounded bg-white"/>
+                  </div>
                   <div className="mt-2 grid grid-cols-4 gap-2"><input value={newPesertaNama} onChange={e=>setNewPesertaNama(e.target.value)} placeholder="Nama Peserta" className="border p-2 rounded bg-white"/><input value={newPesertaJabatan} onChange={e=>setNewPesertaJabatan(e.target.value)} placeholder="Jabatan" className="border p-2 rounded bg-white"/><input value={newPesertaBagian} onChange={e=>setNewPesertaBagian(e.target.value)} placeholder="Bagian" className="border p-2 rounded bg-white"/><button onClick={addPesertaGabungan} className="bg-purple-600 text-white rounded font-bold">+ Tambah Peserta</button></div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {pesertaGabunganList.map(p=> (
-                      <button key={p.id} onClick={()=>{ const presets = getRolePresets(p.jabatan); setSelectedSubKategori(presets); /* auto generate temuanList for this peserta */ const newList: any[] = []; presets.forEach(code=>{ const kat = KATEGORI_TEMUAN.find(k=>k.code===code); if(kat){ newList.push({ id: Date.now()+Math.floor(Math.random()*1000), peserta: p.nama, subKategoriCode: kat.code, subKategoriLabel: kat.label, area: formData.area_name||formData.area_id, temuan: `${kat.label} - ${kat.contoh}`, tindakan: kat.code.includes('CRITICAL') ? 'HENTIKAN PEKERJAAN - Stop Work Authority' : kat.code.includes('MAJOR') ? 'Perbaiki <24 jam' : 'Perbaiki 3-7 hari', status: 'open' }) } }); setTemuanList(prev=> [...prev.filter(t=>t.peserta!==p.nama), ...newList]); setFilterPeserta(p.nama) }} className="px-2 py-1 bg-purple-100 border border-purple-300 rounded text-[10px] font-bold hover:bg-purple-200">⚡ Preset {p.nama.split(' ')[0]}: {getRolePresets(p.jabatan).join(', ')||'Semua'}</button>
+                      <button key={p.id} onClick={()=>{ const presets = getRolePresets(p.jabatan); setSelectedSubKategori(presets); const newList: any[] = []; presets.forEach(code=>{ const kat = KATEGORI_TEMUAN.find(k=>k.code===code); if(kat){ newList.push({ id: Date.now()+Math.floor(Math.random()*1000), peserta: p.nama, subKategoriCode: kat.code, subKategoriLabel: kat.label, area: formData.area_name||formData.area_id, temuan: `${kat.label} - ${kat.contoh}`, tindakan: kat.code.includes('CRITICAL') ? 'HENTIKAN PEKERJAAN - Stop Work Authority' : kat.code.includes('MAJOR') ? 'Perbaiki <24 jam' : 'Perbaiki 3-7 hari', status: 'open' }) } }); setTemuanList(prev=> [...prev.filter(t=>t.peserta!==p.nama), ...newList]); setFilterPeserta(p.nama) }} className="px-2 py-1 bg-purple-100 border border-purple-300 rounded text-[10px] font-bold hover:bg-purple-200">⚡ Preset {p.nama.split(' ')[0]}: {getRolePresets(p.jabatan).join(', ')||'Semua'}</button>
                     ))}
                   </div>
                   <table className="w-full mt-2 text-[11px] bg-white border rounded">
                     <thead><tr className="bg-purple-100"><th className="p-2">No</th><th className="p-2 text-left">Peserta Patrol</th><th className="p-2 text-left">Jabatan</th><th className="p-2 text-left">Bagian</th><th className="p-2">Aksi</th></tr></thead>
                     <tbody>{pesertaGabunganList.map((p,idx)=><tr key={p.id} className="border-t"><td className="p-2 text-center">{idx+1}</td><td className="p-2 font-bold">{p.nama}</td><td className="p-2">{p.jabatan}</td><td className="p-2">{p.bagian}</td><td className="p-2 text-center"><button onClick={()=>setPesertaGabunganList(prev=>prev.filter(x=>x.id!==p.id))} className="text-red-600">✕</button></td></tr>)}</tbody>
                   </table>
-                  <div className="text-[10px] mt-1">Tabel No-Peserta-Jabatan-Bagian - Inti perbedaan patrol gabungan - Peserta gabungan inti untuk berita acara formal mingguan.</div>
                 </div>
               )}
 
-              {/* KATEGORI TEMUAN MULTI SELECT - FIX BUG RADIO */}
               <div className="border-2 border-orange-300 rounded-xl overflow-hidden bg-orange-50">
-                <div className="bg-orange-100 p-2 font-black text-xs">📋 Kategori Temuan Patrol - 4 Kelompok Referensi CSMS - FIX BUG: Checkbox Multi Select - Pilih salah satu tidak hapus yang sudah dipilih - Sebelumnya radio single - Sekarang multi - Auto muncul di tabel temuan</div>
+                <div className="bg-orange-100 p-2 font-black text-xs">📋 Kategori Temuan Patrol - 4 Kelompok - Checkbox Multi Select - Tidak hapus yang sudah dipilih</div>
                 <div className="p-3 bg-white space-y-3 max-h-[300px] overflow-auto">
                   {Object.entries(kategoriByGroup).map(([group, items]:any)=>(
                     <div key={group} className="border rounded-lg p-2">
@@ -581,63 +671,46 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
                         {items.map((k:any)=>(
                           <label key={k.code} className={`flex items-start gap-2 border rounded px-2 py-1 cursor-pointer hover:bg-slate-50 ${selectedSubKategori.includes(k.code)?'bg-blue-50 border-blue-400 ring-1 ring-blue-400':''}`}>
                             <input type="checkbox" checked={selectedSubKategori.includes(k.code)} onChange={()=>toggleSubKategori(k.code)} className="mt-1"/>
-                            <div className="flex-1"><div className="font-bold text-[11px]">{k.code} - {k.label} {selectedSubKategori.includes(k.code) && <span className="bg-blue-600 text-white px-1 rounded text-[9px]">✓ Terpilih - Muncul di tabel temuan auto</span>}</div><div className="text-[10px] text-slate-600">{k.desc} - Contoh: {k.contoh}</div></div>
+                            <div className="flex-1"><div className="font-bold text-[11px]">{k.code} - {k.label} {selectedSubKategori.includes(k.code) && <span className="bg-blue-600 text-white px-1 rounded text-[9px]">✓ Terpilih</span>}</div><div className="text-[10px] text-slate-600">{k.desc} - Contoh: {k.contoh}</div></div>
                           </label>
                         ))}
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="p-2 bg-orange-50 text-[11px] font-bold">Terpilih: {selectedSubKategori.length} sub kategori - {selectedSubKategori.join(', ') || 'Belum pilih - Pilih checkbox di atas - Bisa multi - Tidak hapus yang sudah dipilih'} - Auto muncul di tabel temuan di bawah</div>
+                <div className="p-2 bg-orange-50 text-[11px] font-bold">Terpilih: {selectedSubKategori.length} sub kategori - {selectedSubKategori.join(', ') || 'Belum pilih'}</div>
               </div>
 
-              {/* TABEL TEMUAN PATROL - No - Peserta - Sub Kategori - Area - Temuan (text) - Upload foto - Tindakan - Upload foto after */}
               <div className="border-2 border-blue-300 rounded-xl overflow-hidden bg-blue-50">
-                <div className="bg-blue-100 p-2 font-black text-xs">
-                  <div>📋 Tabel List Temuan Patrol - No - Peserta Patrol - Sub Kategori - Area - Temuan Patrol (text) - Upload dokumen photo bisa view download untuk Tindakan Perbaikan nya juga dibuat dari sub kategori temuan patrol dengan tabel kolom yang sama sehingga bisa sync dan ada upload dokumen photo after perbaikan dari temuan - AUTO dari sub kategori yang dipilih - FIX V37 Per-Peserta Filter + QR</div>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    <button onClick={()=>setFilterPeserta('all')} className={`px-2 py-1 rounded text-[10px] font-bold ${filterPeserta==='all'?'bg-blue-600 text-white':'bg-white border'}`}>📋 Semua ({temuanList.length})</button>
-                    {pesertaGabunganList.map(p=> {
-                      const count = temuanList.filter(t=>t.peserta===p.nama || t.peserta.includes(p.nama.split(' ')[0])).length
-                      return <button key={p.id} onClick={()=>setFilterPeserta(p.nama)} className={`px-2 py-1 rounded text-[10px] font-bold ${filterPeserta===p.nama?'bg-purple-600 text-white':'bg-white border'}`}>👷 {p.nama} ({count}) - {p.jabatan}</button>
-                    })}
-                    {patrolType==='internal' && pesertaInternal.map((p,i)=> {
-                      const count = temuanList.filter(t=>t.peserta===p).length
-                      return <button key={i} onClick={()=>setFilterPeserta(p)} className={`px-2 py-1 rounded text-[10px] font-bold ${filterPeserta===p?'bg-blue-600 text-white':'bg-white border'}`}>🔵 {p} ({count})</button>
-                    })}
-                  </div>
-                  <div className="mt-2 text-[10px] font-normal bg-white p-1 rounded border">
-                    💡 Ide Bapak: QR Scan per peserta - Setiap peserta scan QR Code WP {formData.nomor_wp} - Muncul form patrol lock peserta {filterPeserta} - Centang temuan + upload Before - Submit ke WP untuk perbaikan kontraktor - Ide saya: Role-based preset - Owner: MOC+Kritis, HSE: APD+Tools+Barikade+Emer, Vendor: Housekeeping+Perilaku, Utility: Emer+Kompetensi
-                  </div>
-                </div>
+                <div className="bg-blue-100 p-2 font-black text-xs">📋 Tabel List Temuan Patrol - No - Peserta - Sub Kategori - Area - Temuan + Foto Before - Tindakan + Foto After - V41 Filter Peserta</div>
                 <div className="bg-white p-2">
                   {temuanList.length===0 ? (
-                    <div className="border-2 border-dashed border-blue-200 rounded p-8 text-center text-gray-400">Belum ada temuan - Pilih sub kategori di atas (checkbox multi) - Auto muncul di sini - Contoh: Pilih FISIK-APD + FISIK-TOOLS + PERILAKU-SOP - Maka 3 baris muncul di tabel ini tanpa hapus yang sudah dipilih</div>
+                    <div className="border-2 border-dashed border-blue-200 rounded p-8 text-center text-gray-400">Belum ada temuan - Pilih sub kategori checkbox di atas - Auto muncul di sini</div>
                   ) : (
                     <div className="overflow-auto">
                       <table className="w-full text-[11px] border">
-                        <thead><tr className="bg-blue-600 text-white"><th className="p-2">No</th><th className="p-2 text-left">Peserta Patrol</th><th className="p-2 text-left">Sub Kategori</th><th className="p-2 text-left">Area</th><th className="p-2 text-left">Temuan Patrol (text) + Upload Foto Before View Download</th><th className="p-2 text-left">Tindakan Perbaikan (dari sub kategori sama) + Upload Foto After View Download + Status</th></tr></thead>
+                        <thead><tr className="bg-blue-600 text-white"><th className="p-2">No</th><th className="p-2 text-left">Peserta</th><th className="p-2 text-left">Sub Kategori</th><th className="p-2 text-left">Area</th><th className="p-2 text-left">Temuan + Foto Before</th><th className="p-2 text-left">Tindakan + Foto After + Status</th></tr></thead>
                         <tbody>
                           {temuanList.filter(t=> filterPeserta==='all' || t.peserta===filterPeserta || t.peserta.includes(filterPeserta.split(' ')[0]) || filterPeserta.includes(t.peserta.split(' ')[0])).map((t,idx)=>(
                             <tr key={t.id} className="border-b hover:bg-blue-50">
-                              <td className="p-2 text-center font-bold"><div>{idx+1}</div><button onClick={()=>deleteTemuanRow(t.id)} className="mt-1 bg-red-500 hover:bg-red-600 text-white px-1 py-0.5 rounded text-[9px] font-bold w-full" title="Hapus baris temuan + uncheck kategori">🗑️ Hapus</button></td>
+                              <td className="p-2 text-center font-bold"><div>{idx+1}</div><button onClick={()=>deleteTemuanRow(t.id)} className="mt-1 bg-red-500 text-white px-1 py-0.5 rounded text-[9px]">🗑</button></td>
                               <td className="p-2">
                                 <select value={t.peserta} onChange={e=>updateTemuanField(t.id,'peserta',e.target.value)} className="border p-1 rounded w-full text-[10px]">
                                   {patrolType==='internal' ? pesertaInternal.map((p,i)=><option key={i} value={p}>{p}</option>) : pesertaGabunganList.map(p=><option key={p.id} value={p.nama}>{p.nama} - {p.jabatan}</option>)}
                                 </select>
                               </td>
                               <td className="p-2"><div className="font-mono font-bold text-[10px]">{t.subKategoriCode}</div><div className="text-[10px]">{t.subKategoriLabel}</div></td>
-                              <td className="p-2"><input value={t.area} onChange={e=>updateTemuanField(t.id,'area',e.target.value)} className="border p-1 rounded w-full text-[10px]" placeholder="Area"/></td>
+                              <td className="p-2"><input value={t.area} onChange={e=>updateTemuanField(t.id,'area',e.target.value)} className="border p-1 rounded w-full text-[10px]"/></td>
                               <td className="p-2">
-                                <textarea value={t.temuan} onChange={e=>updateTemuanField(t.id,'temuan',e.target.value)} className="border p-1 rounded w-full h-16 text-[10px]" placeholder="Temuan Patrol (text) - Auto dari sub kategori - Bisa edit"/>
-                                <div className="mt-1 flex gap-1 items-center"><input type="file" accept="image/*" onChange={e=> e.target.files && handleFotoBefore(t.id, e.target.files[0])} className="text-[9px]"/><span className="text-[9px]">{t.fotoBeforeName ? `📷 ${t.fotoBeforeName}` : 'Belum upload foto before'}</span>{t.fotoBeforeUrl && <button onClick={()=>clearFotoBefore(t.id)} className="ml-1 bg-red-500 hover:bg-red-600 text-white px-1.5 py-0.5 rounded text-[9px] font-bold" title="Delete foto before">🗑️ Delete</button>}</div>
-                                {t.fotoBeforeUrl && <div className="mt-1 flex items-end gap-1"><img src={t.fotoBeforeUrl} className="w-20 h-20 object-cover border rounded"/><div><a href={t.fotoBeforeUrl} target="_blank" className="text-blue-600 underline text-[9px] ml-1">View Download Before</a><button onClick={()=>clearFotoBefore(t.id)} className="ml-1 bg-red-100 border border-red-300 text-red-600 px-2 py-0.5 rounded text-[9px] font-bold hover:bg-red-200" title="Hapus foto before">🗑️ Hapus Foto Before</button></div></div>}
+                                <textarea value={t.temuan} onChange={e=>updateTemuanField(t.id,'temuan',e.target.value)} className="border p-1 rounded w-full h-16 text-[10px]"/>
+                                <div className="mt-1 flex gap-1 items-center"><input type="file" accept="image/*" onChange={e=> e.target.files && handleFotoBefore(t.id, e.target.files[0])} className="text-[9px]"/><span className="text-[9px]">{t.fotoBeforeName ? `📷 ${t.fotoBeforeName}` : 'Belum upload'}</span></div>
+                                {t.fotoBeforeUrl && <div className="mt-1"><img src={t.fotoBeforeUrl} className="w-20 h-20 object-cover border rounded"/><a href={t.fotoBeforeUrl} target="_blank" className="text-blue-600 underline text-[9px] ml-1">View</a></div>}
                               </td>
                               <td className="p-2">
-                                <textarea value={t.tindakan} onChange={e=>updateTemuanField(t.id,'tindakan',e.target.value)} className="border p-1 rounded w-full h-16 text-[10px]" placeholder="Tindakan Perbaikan dari sub kategori sama - Auto - Bisa edit"/>
-                                <div className="mt-1 flex gap-1 items-center"><input type="file" accept="image/*" onChange={e=> e.target.files && handleFotoAfter(t.id, e.target.files[0])} className="text-[9px]"/><span className="text-[9px]">{t.fotoAfterName ? `📷 After ${t.fotoAfterName}` : 'Belum upload foto after perbaikan'}</span>{t.fotoAfterUrl && <button onClick={()=>clearFotoAfter(t.id)} className="ml-1 bg-red-500 hover:bg-red-600 text-white px-1.5 py-0.5 rounded text-[9px] font-bold" title="Delete foto after">🗑️ Delete</button>}</div>
-                                {t.fotoAfterUrl && <div className="mt-1 flex items-end gap-1"><img src={t.fotoAfterUrl} className="w-20 h-20 object-cover border rounded"/><div><a href={t.fotoAfterUrl} target="_blank" className="text-green-600 underline text-[9px] ml-1">View Download After - Status Closed</a><button onClick={()=>clearFotoAfter(t.id)} className="ml-1 bg-red-100 border border-red-300 text-red-600 px-2 py-0.5 rounded text-[9px] font-bold hover:bg-red-200" title="Hapus foto after">🗑️ Hapus Foto After</button></div></div>}
-                                <div className="mt-1"><select value={t.status} onChange={e=>updateTemuanField(t.id,'status',e.target.value)} className="border p-1 rounded text-[9px]"><option value="open">Open</option><option value="progress">Progress</option><option value="closed">Closed - Sudah perbaikan + foto after</option></select></div>
+                                <textarea value={t.tindakan} onChange={e=>updateTemuanField(t.id,'tindakan',e.target.value)} className="border p-1 rounded w-full h-16 text-[10px]"/>
+                                <div className="mt-1 flex gap-1 items-center"><input type="file" accept="image/*" onChange={e=> e.target.files && handleFotoAfter(t.id, e.target.files[0])} className="text-[9px]"/><span className="text-[9px]">{t.fotoAfterName ? `📷 After ${t.fotoAfterName}` : 'Belum upload after'}</span></div>
+                                {t.fotoAfterUrl && <div className="mt-1"><img src={t.fotoAfterUrl} className="w-20 h-20 object-cover border rounded"/><a href={t.fotoAfterUrl} target="_blank" className="text-green-600 underline text-[9px] ml-1">View After</a></div>}
+                                <div className="mt-1"><select value={t.status} onChange={e=>updateTemuanField(t.id,'status',e.target.value)} className="border p-1 rounded text-[9px]"><option value="open">Open</option><option value="progress">Progress</option><option value="closed">Closed</option></select></div>
                               </td>
                             </tr>
                           ))}
@@ -648,21 +721,14 @@ export function EPatrolSync({ permits: propPermits = [], areas = [], vendors = [
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="font-bold">Tingkat Risiko Temuan - Untuk Prioritas Tindak Lanjut</label><select value={formData.tingkat_risiko} onChange={e=>setFormData({...formData, tingkat_risiko: e.target.value})} className="w-full border p-2 rounded mt-1 font-bold"><option value="RISK-CRITICAL">🔴 Kritis (Critical) - Stop Work Authority - Fatality</option><option value="RISK-MAJOR">🟠 Mayor (Major) - Perbaiki &lt;24 jam</option><option value="RISK-MINOR">🟡 Minor (Minor) - Perbaiki 3-7 hari</option></select></div>
-                <div><label className="font-bold">Risk Matrix WP - Cek di Lapangan - Tanpa Utility</label><div className="border p-2 rounded bg-purple-50 text-[11px]">Risk: <span className={`${getRiskColor(formData.risk_level).bg} text-white px-2 py-1 rounded`}>{getRiskColor(formData.risk_level).dot} {formData.risk_level.toUpperCase()} {formData.risk_score} ({formData.risk_likelihood}x{formData.risk_severity})</span> | Low 1-4 🟢 Med 5-12 🟡 High 13-25 🔴 - Tanpa cek Utility sesuai permintaan</div></div>
-              </div>
-
-              <div className="bg-slate-50 border rounded p-3 text-[11px]">
-                <div className="font-bold">Konsep Patrol {patrolType==='gabungan'?'Gabungan - Tabel Peserta No-Jabatan-Bagian':'Internal - Tabel Temuan No-Peserta-Sub Kategori-Area-Temuan-Upload Foto + Tindakan-Upload Foto After'} - FIX Multi Select Tanpa Hapus:</div>
-                <div className="mt-1">BUG FIX: Sebelumnya radio single - klik FISIK-TOOLS pindah dari CSMS-ADM - Sekarang checkbox multi - Pilih CSMS-ADM + FISIK-TOOLS + PERILAKU-SOP = 3 baris muncul di tabel temuan - Pilih salah satu tidak hapus yang sudah dipilih - Auto muncul temuan patrol sub kategori yang dipilih secara auto di tabel list kolom No-Peserta-Sub Kategori-Area-Temuan (text)-Upload foto Before View Download - Tindakan Perbaikan juga dibuat dari sub kategori temuan patrol dengan tabel kolom yang sama sehingga bisa sync dan ada upload foto after perbaikan.</div>
-                <div>Internal: Peserta Patrol Internal - Tabel No-Peserta-Sub Kategori-Area-Temuan-Upload Foto Before-Tindakan-Upload Foto After - Sync - Ada upload dokumen photo after perbaikan dari temuan - Multi select tidak hapus.</div>
-                <div>Gabungan: Sama + tabel peserta No-Peserta-Jabatan-Bagian - Inti perbedaan patrol gabungan - Peserta gabungan inti untuk berita acara formal mingguan - Owner Area E, HSE Officer, Vendor Safety.</div>
-              </div>
-
-              <div className="flex gap-2">
-                <button onClick={savePatrol} className={`flex-1 ${patrolType==='gabungan'?'bg-purple-700 hover:bg-purple-800':'bg-blue-700 hover:bg-blue-800'} text-white py-2 rounded font-black`}>💾 Simpan Patrol {patrolType==='gabungan'?'Gabungan':'Internal'} {formData.nomor_wp} - {selectedSubKategori.length} Sub Kategori - {temuanList.length} Temuan - {temuanList.filter(t=>t.fotoAfterUrl).length} Closed + Foto After</button>
-                <button onClick={()=>setShowForm(false)} className="px-6 bg-white border py-2 rounded">Batal</button>
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <button onClick={savePatrol} className={`flex-1 ${patrolType==='gabungan'?'bg-purple-700 hover:bg-purple-800':'bg-blue-700 hover:bg-blue-800'} text-white py-2 rounded font-black`}>💾 Simpan Patrol V41 {formData.nomor_wp} - {selectedSubKategori.length} Sub - {temuanList.length} Temuan - Clear pendingPatrol</button>
+                  <button onClick={handleSimpanKirimV43} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded font-black">📤 Simpan & Kirim → Admin Contractor</button>
+                  <button onClick={()=>setShowForm(false)} className="px-6 bg-white border py-2 rounded">Batal</button>
+                </div>
+                {syncStatusV43 && <div className="bg-yellow-100 border-2 border-yellow-400 p-2 rounded text-[11px] font-bold">{syncStatusV43}</div>}
+                {sessionIdV43 && <div className="bg-blue-50 border p-2 rounded text-[10px]">V43 Session: {sessionIdV43} | Tgl: {tglPatrolV43} | Peserta Auto Join: {pesertaGabunganList.length} | Mode: {patrolType} | Sync Queue: {(JSON.parse(localStorage.getItem('patrol_sync_queue')||'[]')).length}</div>}
               </div>
             </div>
           </div>

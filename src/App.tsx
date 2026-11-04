@@ -1,5 +1,5 @@
-// @ts-nocheck - FIX FINAL: Pakai namespace import * as -> TIDAK PERNAH error default/named
-// V41 QR PATROL GABUNGAN FIX - PT MRH DigitalHub - CSMS INTEGRATED
+
+// @ts-nocheck - V43 Mobile Entry Choose Mode - PT MRH DigitalHub
 import { useState, useEffect } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { useAreas } from './hooks/useAreas'
@@ -7,10 +7,9 @@ import { useVendors } from './hooks/useVendors'
 import { useWorkPermits } from './hooks/useWorkPermits'
 import { usePatrols } from './hooks/usePatrols'
 import { supabase } from './lib/supabase'
-import { APP_CONFIG } from './types'
 import Login from './pages/Login'
+import PatrolEntryMobile from './pages/PatrolEntryMobile'
 
-// FIX PUTIH FINAL: Pakai namespace import * as -> Vite TIDAK PERNAH error "does not provide export named 'default'/'DashboardFlow'"
 import * as DashMod from './pages/0_DashboardFlow'
 import * as VendMod from './pages/1_Vendor8Elemen'
 import * as WpMod from './pages/2_EWorkPermitFlow'
@@ -35,8 +34,7 @@ function getComp(mod, name){
   }
   for (const k of keys) { if (typeof mod[k] === 'function') return mod[k] }
   if (typeof mod === 'function') return mod
-  console.error(`GAGAL LOAD ${name}`, mod)
-  return () => <div className="p-6 text-red-500">Error: Component {name} tidak bisa dimuat. Cek export di src/pages/</div>
+  return () => <div className="p-6 text-red-500">Error: Component {name} tidak bisa dimuat</div>
 }
 
 const DashboardFlow = getComp(DashMod, 'DashboardFlow')
@@ -54,6 +52,8 @@ export default function App(){
   const [appSettings, setAppSettings] = useState<any>({})
   const [showSettings, setShowSettings] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [patrolEntryParams, setPatrolEntryParams] = useState<any>(null)
+  const [showPatrolEntry, setShowPatrolEntry] = useState(false)
 
   const { areas } = useAreas()
   const useVendorsHook = useVendors()
@@ -65,50 +65,50 @@ export default function App(){
 
   useEffect(()=>{
     checkAuth()
-    handleQRPatrol() // V41 FIX QR GABUNGAN
+    handleQRPatrolV43()
     const interval = setInterval(loadSettings, 1000)
     return () => clearInterval(interval)
   },[])
 
-  // V41 FIX QR PATROL GABUNGAN - AUTO FILTER + AUTO OPEN FORM
-  function handleQRPatrol(){
+  // V43 FIX - QR Universal Entry Choose Mode
+  function handleQRPatrolV43(){
     try{
       if (typeof window === 'undefined') return
       const params = new URLSearchParams(window.location.search)
       const isPatrol = params.get('patrol') === '1'
       const wp = params.get('wp') || params.get('wp_id') || ''
-      const mode = params.get('mode') || 'gabungan'
+      const modeParam = params.get('mode') || 'choose'
       const autoOpen = params.get('autoOpen') || '1'
+      const area = params.get('area') || 'Area E'
+      const vendor = params.get('vendor') || ''
+      const judul = params.get('judul') || ''
       if (isPatrol && wp){
-        console.log('[V41 QR Patrol] Detected:', {wp, mode, autoOpen})
-        // Simpan untuk dibaca 4_EPatrolSync
-        localStorage.setItem('pendingPatrol', JSON.stringify({wp, mode, autoOpen, timestamp: Date.now()}))
+        console.log('[V43 QR Patrol] Detected entry:', {wp, modeParam, area, vendor, judul})
+        const entry = {wp, mode: modeParam, area, vendor, judul, autoOpen, timestamp: Date.now()}
+        setPatrolEntryParams(entry)
+        // V43 FIX - Selalu tampilkan PatrolEntryMobile dulu biar input peserta + pilih Internal/Gabungan nyaman di HP
+        // Walaupun QR lama mode=gabungan, tetap tampilkan entry mobile dulu (flow No 1-5)
+        setShowPatrolEntry(true)
+        // Simpan juga untuk EPatrolSync
+        localStorage.setItem('pendingPatrol', JSON.stringify(entry))
         localStorage.setItem('patrol_wp_filter', wp)
-        localStorage.setItem('patrol_mode', mode)
-        // Auto pindah ke menu patrol
-        setActiveMenu('patrol')
-        // Bersihkan URL tapi jangan hapus filter (V9 LOGIN PERSIST)
-        // Delay 500ms biar EPatrolSync sempat baca
+        localStorage.setItem('patrol_mode', modeParam || 'choose')
+
         setTimeout(()=>{
-          try{
-            const cleanUrl = window.location.pathname
-            window.history.replaceState({}, '', cleanUrl)
-          }catch{}
-        }, 800)
+          try{ window.history.replaceState({}, '', window.location.pathname) }catch{}
+        }, 1200)
       } else {
-        // Cek juga pendingPatrol dari scan sebelumnya
         const pendingRaw = localStorage.getItem('pendingPatrol')
         if (pendingRaw){
           try{
             const p = JSON.parse(pendingRaw)
-            if (p.wp){
-              console.log('[V41 QR Patrol] Found pendingPatrol in storage:', p)
-              setActiveMenu('patrol')
+            if (p.wp && Date.now() - p.timestamp < 3600000*24){
+              console.log('[V43] Found pendingPatrol', p)
             }
           }catch{}
         }
       }
-    }catch(e){ console.error('QR Patrol handle error', e) }
+    }catch(e){ console.error('QR Patrol V43 error', e) }
   }
 
   function loadSettings(){
@@ -132,17 +132,10 @@ export default function App(){
   }
 
   const isSuperAdmin = profile && (profile.role === 'admin_contractor' || profile.email === 'admin_contractor@mrhdigitalhub.com')
-  const companyName = appSettings.company_name || ''
-  const logoUrl = appSettings.logo_url || ''
-  const tagline1 = appSettings.company_tagline_1 || ''
-  const hasCustomBranding = !!(logoUrl || companyName)
 
   const handleLogout = async () => {
     try { await supabase.auth.signOut() } catch {}
     localStorage.removeItem('mrh_profile'); localStorage.removeItem('mrh_user_id'); localStorage.removeItem('mrh_role'); localStorage.removeItem('mrh_vendor_id'); localStorage.removeItem('mrh_area_id')
-    // V9 FIX: JANGAN HAPUS patrol data saat logout biar QR persist setelah login lagi
-    // localStorage.removeItem('pendingPatrol') -> JANGAN
-    // localStorage.removeItem('patrol_wp_filter') -> JANGAN
     Object.keys(localStorage).forEach(k => { if (k.startsWith('sb-')) localStorage.removeItem(k) })
     window.location.replace('/login')
   }
@@ -161,13 +154,22 @@ export default function App(){
   if (!profile && isLoginPage) return <Login />
   if (!profile && !isLoginPage) { window.location.replace('/login'); return <div className="min-h-screen flex items-center justify-center">Redirect ke Login...</div> }
 
+  // V43 MOBILE ENTRY PAGE - TAMPIL FULL JIKA SCAN QR CHOOSE MODE
+  if (showPatrolEntry && patrolEntryParams){
+    return <PatrolEntryMobile initialParams={patrolEntryParams} permits={permits} profile={profile} onChoose={(mode, sessionId, peserta)=>{
+      setShowPatrolEntry(false)
+      setActiveMenu('patrol')
+      // sudah disimpan di handleJoin
+    }} />
+  }
+
   if (showSettings) {
     return (
       <div className="min-h-screen bg-gray-100">
         <div className="bg-white border-b p-4 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <button onClick={() => { setShowSettings(false); loadSettings() }} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold">◀ Kembali ke Dashboard</button>
-            <h1 className="font-black text-sm">⚙ Pengaturan - SaaS Permanen - ADMIN ONLY</h1>
+            <button onClick={() => { setShowSettings(false); loadSettings() }} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-bold">◀ Kembali</button>
+            <h1 className="font-black text-sm">⚙ Pengaturan - ADMIN ONLY</h1>
           </div>
           <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-2 rounded text-xs font-bold">Logout</button>
         </div>
@@ -182,8 +184,8 @@ export default function App(){
       <div className={`${sidebarOpen?'ml-64':'ml-16'} flex-1`}>
         <header className="border-b sticky top-0 z-10 px-6 py-3 flex items-center justify-between" style={{ background: appSettings.company_header_bg || "#ffffff", color: appSettings.company_header_text_color || "#000000" }}>
           <div className="flex items-center gap-3">
-            {logoUrl ? <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain bg-white rounded border p-1" /> : <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center text-white font-black text-xs">MRH</div>}
-            <div className="font-black tracking-tight" style={{ fontSize: `${appSettings.company_header_font_size || "18"}px` }}>PT MRH DigitalHub - CSMS INTEGRATED</div>
+            {appSettings.logo_url ? <img src={appSettings.logo_url} alt="Logo" className="w-10 h-10 object-contain bg-white rounded border p-1" /> : <div className="w-10 h-10 bg-blue-900 rounded-lg flex items-center justify-center text-white font-black text-xs">MRH</div>}
+            <div className="font-black tracking-tight" style={{ fontSize: `${appSettings.company_header_font_size || "18"}px` }}>PT MRH DigitalHub - CSMS INTEGRATED - V43</div>
           </div>
           <div className="flex items-center gap-2">
             {isSuperAdmin && (<button onClick={() => setShowSettings(true)} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"><span>⚙</span><span className="text-xs font-bold">Pengaturan</span></button>)}
